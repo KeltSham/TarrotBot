@@ -1,0 +1,350 @@
+:root {
+  --primary-color: #3b0959; /* Deep Purple */
+  --secondary-color: #210433; /* Darker Purple for contrast */
+  --gold: #d4af37; /* Metallic Gold */
+  --light-gold: #f3e5ab; /* Soft Gold for text */
+  --text-bright: #ffffff;
+  --bg-gradient: radial-gradient(circle at center, var(--primary-color), var(--secondary-color));
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Cormorant Garamond', serif;
+  background-color: #0b0213;
+  color: var(--light-gold);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow-x: hidden;
+  position: relative;
+}
+
+.background-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-image: url('images/bg_mystic_1774882343565.png');
+  background-size: cover;
+  background-position: center;
+  opacity: 0.25;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.container {
+  max-width: 800px;
+  width: 100%;
+  padding: 2rem 1rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.header {
+  margin-bottom: 2.5rem;
+  animation: fadeInDown 1.5s ease-out;
+}
+
+.esoteric-symbols {
+  font-size: 2rem;
+  color: var(--gold);
+  letter-spacing: 0.5rem;
+  margin-bottom: 1rem;
+  text-shadow: 0 0 15px rgba(212, 175, 55, 0.5);
+}
+
+h1 {
+  font-family: 'Playfair Display', serif;
+  font-size: 3.5rem;
+  color: var(--gold);
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  text-shadow: 2px 2px 5px rgba(0,0,0,0.8), 0 0 20px rgba(212, 175, 55, 0.4);
+}
+
+.header p {
+  font-size: 1.5rem;
+  color: var(--text-bright);
+  font-weight: 300;
+  letter-spacing: 1px;
+}
+
+.main-content {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.input-section {
+  width: 100%;
+  max-width: 600px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  margin-bottom: 3rem;
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+.input-section.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-20px);
+  position: absolute;
+}
+
+#question-input {
+  width: 100%;
+  padding: 1rem 1.5rem;
+  font-size: 1.2rem;
+  font-family: 'Cormorant Garamond', serif;
+  background: rgba(33, 4, 51, 0.7);
+  border: 1px solid var(--gold);
+  border-radius: 30px;
+  color: var(--text-bright);
+  text-align: center;
+  outline: none;
+  box-shadow: inset 0 0 10px rgba(0,0,0,0.8), 0 0 15px rgba(212, 175, 55, 0.2);
+  transition: all 0.3s ease;
+}
+
+#question-input:focus {
+  border-color: #ffe066;
+  box-shadow: inset 0 0 10px rgba(0,0,0,0.8), 0 0 25px rgba(212, 175, 55, 0.5);
+}
+
+#question-input::placeholder {
+  color: rgba(243, 229, 171, 0.5);
+  font-style: italic;
+}
+
+.mystic-btn {
+  padding: 0.8rem 2.5rem;
+  font-size: 1.2rem;
+  font-family: 'Playfair Display', serif;
+  text-transform: uppercase;
+  background: linear-gradient(135deg, var(--gold), #b8860b);
+  color: #1a0224;
+  border: none;
+  border-radius: 30px;
+  cursor: pointer;
+  font-weight: bold;
+  letter-spacing: 2px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.5), 0 0 20px rgba(212, 175, 55, 0.4);
+  transition: transform 0.2s, box-shadow 0.2s, filter 0.2s;
+}
+
+.mystic-btn:hover {
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.6), 0 0 30px rgba(212, 175, 55, 0.6);
+  filter: brightness(1.1);
+}
+
+.mystic-btn:active {
+  transform: translateY(1px);
+}
+
+/* Tarot Card CSS 3D Effect */
+.tarot-card-container {
+  width: 250px;
+  height: 400px;
+  perspective: 1000px;
+  margin: 0 auto;
+  display: none; /* hidden initially */
+  opacity: 0;
+  transform: scale(0.9);
+  transition: opacity 1s, transform 1s;
+}
+
+.tarot-card-container.visible {
+  display: block;
+  opacity: 1;
+  transform: scale(1);
+  animation: floatCard 4s ease-in-out infinite;
+}
+
+.tarot-card {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  transition: transform 1.2s cubic-bezier(0.8, -0.4, 0.2, 1.4);
+  transform-style: preserve-3d;
+  cursor: pointer;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.8), 0 0 30px rgba(212, 175, 55, 0.3);
+  border-radius: 12px;
+}
+
+.tarot-card.flipped {
+  transform: rotateY(180deg);
+  animation: none; /* stop floating after flip */
+}
+
+.card-face {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  backface-visibility: hidden;
+  border-radius: 12px;
+  background-size: cover;
+  background-position: center;
+  border: 2px solid var(--gold);
+}
+
+.card-back {
+  background-image: url('images/tarot_back_1774882589907.png');
+}
+
+.card-front {
+  background-image: url('images/tarot_front_blank_1774882898806.png');
+  transform: rotateY(180deg);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 15px;
+  position: relative;
+}
+
+.card-overlay-text {
+  background: rgba(11, 2, 19, 0.85);
+  border: 1px solid var(--gold);
+  border-radius: 8px;
+  padding: 1rem 0.5rem;
+  width: 85%;
+  font-family: 'Playfair Display', serif;
+  font-size: 1.5rem;
+  color: var(--gold);
+  text-transform: uppercase;
+  backdrop-filter: blur(4px);
+  text-shadow: 0 0 5px rgba(212, 175, 55, 0.5);
+}
+
+.result-section {
+  width: 100%;
+  max-width: 650px;
+  background: rgba(33, 4, 51, 0.8);
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  border-radius: 15px;
+  padding: 2.5rem;
+  margin-top: 2rem;
+  display: none; /* hidden until flipped */
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 1s, transform 1s;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+  backdrop-filter: blur(10px);
+}
+
+.result-section.visible {
+  display: block;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.result-section h2 {
+  font-family: 'Playfair Display', serif;
+  font-size: 2.5rem;
+  color: var(--gold);
+  margin-bottom: 0.5rem;
+}
+
+.divider {
+  color: var(--gold);
+  font-size: 1.5rem;
+  margin-bottom: 1.5rem;
+  opacity: 0.7;
+}
+
+.result-section p {
+  font-size: 1.3rem;
+  line-height: 1.6;
+  color: var(--text-bright);
+}
+
+.result-section .mystic-btn {
+  margin-top: 2rem;
+  font-size: 1rem;
+  padding: 0.6rem 2rem;
+}
+
+footer {
+  margin-top: auto;
+  padding: 3rem 1rem 1rem;
+  text-align: center;
+}
+
+.esoteric-symbols-bottom {
+  color: var(--gold);
+  font-size: 1.2rem;
+  letter-spacing: 1rem;
+  opacity: 0.6;
+  margin-bottom: 1.5rem;
+}
+
+.consultation-text {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.2rem;
+  color: var(--light-gold);
+  margin-bottom: 1rem;
+  font-style: italic;
+  opacity: 0.9;
+}
+
+.contact-icons {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.contact-link {
+  color: var(--gold);
+  transition: transform 0.3s ease, filter 0.3s ease, color 0.3s ease;
+  display: inline-block;
+  opacity: 0.8;
+}
+
+.contact-link:hover {
+  transform: translateY(-3px) scale(1.1);
+  filter: drop-shadow(0 0 10px var(--gold));
+  opacity: 1;
+}
+
+.contact-link.whatsapp:hover { color: #25D366; filter: drop-shadow(0 0 10px #25D366); }
+.contact-link.telegram:hover { color: #229ED9; filter: drop-shadow(0 0 10px #229ED9); }
+
+/* Animations */
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes floatCard {
+  0% { transform: translateY(0px); box-shadow: 0 20px 40px rgba(0,0,0,0.8), 0 0 25px rgba(212, 175, 55, 0.2); }
+  50% { transform: translateY(-15px); box-shadow: 0 35px 50px rgba(0,0,0,0.8), 0 0 45px rgba(212, 175, 55, 0.5); }
+  100% { transform: translateY(0px); box-shadow: 0 20px 40px rgba(0,0,0,0.8), 0 0 25px rgba(212, 175, 55, 0.2); }
+}
+
+@keyframes glow {
+  from { text-shadow: 0 0 10px #d4af37, 0 0 20px #d4af37; }
+  to { text-shadow: 0 0 20px #fff, 0 0 30px #d4af37; }
+}
+
+@media (max-width: 600px) {
+  h1 { font-size: 2.2rem; }
+  .header p { font-size: 1.2rem; }
+  .tarot-card-container { width: 200px; height: 320px; }
+  .result-section { padding: 1.5rem; }
+  .result-section h2 { font-size: 2rem; }
+  .result-section p { font-size: 1.1rem; }
+}

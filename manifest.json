@@ -1,0 +1,16 @@
+{
+  "name": "Magic Tarot",
+  "short_name": "Tarot",
+  "description": "Эзотерический Таро Расклад - Узнай свою судьбу",
+  "start_url": "/index.html",
+  "display": "standalone",
+  "background_color": "#0b0213",
+  "theme_color": "#3b0959",
+  "icons": [
+    {
+      "src": "images/tarot_back_1774882589907.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
