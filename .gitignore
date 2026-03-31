@@ -1,0 +1,10 @@
+# Database
+users.db
+*.sqlite
+
+# Secret configuration containing Tokens
+bot.py
+
+# Python generated files
+__pycache__/
+*.pyc
