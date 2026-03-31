@@ -36,6 +36,7 @@
       <div class="mode-selection" id="mode-selection">
         <button id="mode-question-btn" class="mystic-btn">Полноценный вопрос</button>
         <button id="mode-daily-btn" class="mystic-btn outline-btn">Карта дня</button>
+        <button id="mode-three-btn" class="mystic-btn outline-btn hidden" style="border-color:#b99aff; color:#b99aff; box-shadow: 0 0 10px #b99aff;">💎 3 Карты (Premium)</button>
       </div>
 
       <div class="input-section hidden" id="input-section">
@@ -52,6 +53,35 @@
           <div class="tarot-card mini" data-index="2"><div class="card-face card-back"></div></div>
         </div>
         <button id="back-to-modes-2" class="text-btn mt-2">Вернуться назад</button>
+      </div>
+      
+      <div class="three-reading-section hidden" id="three-reading-section">
+        <h3 style="color:var(--gold); margin-bottom: 2rem;">Прошлое, Настоящее, Будущее</h3>
+        <button id="draw-three-btn" class="mystic-btn mb-2">Разложить Карты</button>
+        
+        <div class="three-spread-container" id="three-spread-container">
+           <!-- Dynamically populated or statically nested -->
+           <div class="spread-item">
+             <div class="tarot-card-container"><div class="tarot-card" id="tc-0"><div class="card-face card-back"></div><div class="card-face card-front"><div class="card-overlay-text" id="tname-0"></div></div></div></div>
+             <p class="spread-title" style="color:var(--gold); margin-top:1rem;">Прошлое</p>
+           </div>
+           <div class="spread-item">
+             <div class="tarot-card-container"><div class="tarot-card" id="tc-1"><div class="card-face card-back"></div><div class="card-face card-front"><div class="card-overlay-text" id="tname-1"></div></div></div></div>
+             <p class="spread-title" style="color:var(--gold); margin-top:1rem;">Настоящее</p>
+           </div>
+           <div class="spread-item">
+             <div class="tarot-card-container"><div class="tarot-card" id="tc-2"><div class="card-face card-back"></div><div class="card-face card-front"><div class="card-overlay-text" id="tname-2"></div></div></div></div>
+             <p class="spread-title" style="color:var(--gold); margin-top:1rem;">Будущее</p>
+           </div>
+        </div>
+        
+        <div id="three-result-section" class="mt-2 hidden" style="text-align: left; padding: 1rem; border: 1px solid var(--gold); border-radius: 12px; background: rgba(0,0,0,0.5);">
+            <p id="t-meaning-0" style="margin-bottom:1rem;"></p>
+            <p id="t-meaning-1" style="margin-bottom:1rem;"></p>
+            <p id="t-meaning-2"></p>
+        </div>
+        
+        <button id="back-to-modes-3" class="text-btn mt-2">Вернуться назад</button>
       </div>
 
       <div class="tarot-card-container">

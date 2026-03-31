@@ -502,3 +502,41 @@ footer {
   opacity: 0.7;
 }
 .close-popup:hover { opacity: 1; }
+
+.three-reading-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.three-spread-container {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  margin-top: 1rem;
+  margin-bottom: 1.5rem;
+}
+.spread-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.spread-item .tarot-card-container {
+  width: 150px;
+  height: 240px;
+  margin: 0;
+  display: block;
+  opacity: 1;
+}
+.spread-item .tarot-card {
+  width: 100%; height: 100%;
+}
+@media (max-width: 600px) {
+  .three-spread-container {
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+  .spread-item .tarot-card-container {
+    width: 120px;
+    height: 190px;
+  }
+}

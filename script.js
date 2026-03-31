@@ -90,13 +90,26 @@ const cardMeaning = document.getElementById('card-meaning');
 const modeSelection = document.getElementById('mode-selection');
 const modeQuestionBtn = document.getElementById('mode-question-btn');
 const modeDailyBtn = document.getElementById('mode-daily-btn');
+const modeThreeBtn = document.getElementById('mode-three-btn');
 const backToModesBtn = document.getElementById('back-to-modes');
 const backToModesBtn2 = document.getElementById('back-to-modes-2');
+const backToModesBtn3 = document.getElementById('back-to-modes-3');
 const dailyCardsSection = document.getElementById('daily-cards-section');
+const threeReadingSection = document.getElementById('three-reading-section');
+const drawThreeBtn = document.getElementById('draw-three-btn');
+const threeResultSection = document.getElementById('three-result-section');
 const miniCards = document.querySelectorAll('.tarot-card.mini');
 const limitMessage = document.getElementById('limit-message');
 const upsellPopup = document.getElementById('upsell-popup');
 const closePopupBtn = document.getElementById('close-popup');
+
+// Check URL param for Premium
+const urlParams = new URLSearchParams(window.location.search);
+const isPremium = urlParams.get('premium') === '1';
+
+if (isPremium) {
+  modeThreeBtn.classList.remove('hidden');
+}
 
 let upsellTimer = null;
 
@@ -147,13 +160,32 @@ modeDailyBtn.addEventListener('click', () => {
   }, 300);
 });
 
-[backToModesBtn, backToModesBtn2].forEach(btn => {
+if (isPremium) {
+  modeThreeBtn.addEventListener('click', () => {
+    modeSelection.style.opacity = '0';
+    setTimeout(() => {
+      modeSelection.classList.add('hidden');
+      threeReadingSection.classList.remove('hidden');
+      setTimeout(() => { threeReadingSection.style.opacity = '1'; }, 50);
+    }, 300);
+  });
+}
+
+[backToModesBtn, backToModesBtn2, backToModesBtn3].forEach(btn => {
   btn.addEventListener('click', () => {
     inputSection.classList.add('hidden');
     dailyCardsSection.classList.add('hidden');
+    threeReadingSection.classList.add('hidden');
     modeSelection.classList.remove('hidden');
     modeSelection.style.opacity = '1';
     questionInput.value = '';
+    
+    // reset 3-card
+    threeResultSection.classList.add('hidden');
+    drawThreeBtn.style.display = 'block';
+    for(let i=0; i<3; i++) {
+        document.getElementById(`tc-${i}`).classList.remove('flipped');
+    }
   });
 });
 
@@ -238,6 +270,9 @@ function performReading(mode = 'question') {
     setTimeout(() => {
       cardNameOverlay.innerText = cardText;
       tarotCard.classList.add('flipped');
+      if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
+          window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
+      }
       
       setTimeout(() => {
         cardTitle.innerText = `Ваша карта: ${cardText}`;
@@ -275,4 +310,40 @@ resetBtn.addEventListener('click', () => {
     
     setTimeout(() => { window.scrollTo({ top: 0, behavior: 'smooth' }); }, 50);
   }, 1000);
+});
+
+// --- Three Card Logic ---
+drawThreeBtn.addEventListener('click', () => {
+  drawThreeBtn.style.display = 'none';
+  
+  // pick 3 unique cards
+  let deckCopy = [...tarotDeck];
+  let picked = [];
+  for(let i = 0; i < 3; i++) {
+     let idx = Math.floor(Math.random() * deckCopy.length);
+     picked.push(deckCopy[idx]);
+     deckCopy.splice(idx, 1);
+  }
+  
+  // Flip sequence
+  picked.forEach((card, index) => {
+      setTimeout(() => {
+          document.getElementById(`tname-${index}`).innerText = card.name;
+          document.getElementById(`tc-${index}`).classList.add('flipped');
+          
+          if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
+              window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
+          }
+          
+          if (index === 2) {
+             setTimeout(() => {
+                 document.getElementById('t-meaning-0').innerHTML = `<strong>Прошлое (${picked[0].name}):</strong><br>${picked[0].meaning}`;
+                 document.getElementById('t-meaning-1').innerHTML = `<strong>Настоящее (${picked[1].name}):</strong><br>${picked[1].meaning}`;
+                 document.getElementById('t-meaning-2').innerHTML = `<strong>Будущее (${picked[2].name}):</strong><br>${picked[2].meaning}`;
+                 threeResultSection.classList.remove('hidden');
+                 window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+             }, 1000);
+          }
+      }, index * 800);
+  });
 });
