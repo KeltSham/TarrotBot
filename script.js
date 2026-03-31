@@ -115,6 +115,7 @@ let upsellTimer = null;
 
 // --- Limit Logic ---
 function checkDailyLimit() {
+  if (isPremium) return true;
   const today = new Date().toDateString();
   const usageData = JSON.parse(localStorage.getItem('tarotUsage')) || { date: '', count: 0 };
   
@@ -127,6 +128,7 @@ function checkDailyLimit() {
 }
 
 function incrementDailyUsage() {
+  if (isPremium) return;
   const usageData = JSON.parse(localStorage.getItem('tarotUsage'));
   usageData.count += 1;
   localStorage.setItem('tarotUsage', JSON.stringify(usageData));
