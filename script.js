@@ -75,7 +75,7 @@ function analyzeContext(question) {
 // Select Elements
 const drawBtn = document.getElementById('draw-btn');
 const resetBtn = document.getElementById('reset-btn');
-const inputSection = document.querySelector('.input-section');
+const inputSection = document.getElementById('input-section');
 const questionInput = document.getElementById('question-input');
 const tarotCardContainer = document.querySelector('.tarot-card-container');
 const tarotCard = document.getElementById('tarot-card');
@@ -85,54 +85,154 @@ const cardNameOverlay = document.getElementById('card-name-overlay');
 const cardTitle = document.getElementById('card-title');
 const cardMeaning = document.getElementById('card-meaning');
 
-drawBtn.addEventListener('click', performReading);
+// New Feature Elements
+const modeSelection = document.getElementById('mode-selection');
+const modeQuestionBtn = document.getElementById('mode-question-btn');
+const modeDailyBtn = document.getElementById('mode-daily-btn');
+const backToModesBtn = document.getElementById('back-to-modes');
+const backToModesBtn2 = document.getElementById('back-to-modes-2');
+const dailyCardsSection = document.getElementById('daily-cards-section');
+const miniCards = document.querySelectorAll('.tarot-card.mini');
+const limitMessage = document.getElementById('limit-message');
+const upsellPopup = document.getElementById('upsell-popup');
+const closePopupBtn = document.getElementById('close-popup');
 
-questionInput.addEventListener('keypress', function(e) {
-  if (e.key === 'Enter') {
-    performReading();
+let upsellTimer = null;
+
+// --- Limit Logic ---
+function checkDailyLimit() {
+  const today = new Date().toDateString();
+  const usageData = JSON.parse(localStorage.getItem('tarotUsage')) || { date: '', count: 0 };
+  
+  if (usageData.date !== today) {
+    usageData.date = today;
+    usageData.count = 0;
+    localStorage.setItem('tarotUsage', JSON.stringify(usageData));
   }
+  return usageData.count < 3;
+}
+
+function incrementDailyUsage() {
+  const usageData = JSON.parse(localStorage.getItem('tarotUsage'));
+  usageData.count += 1;
+  localStorage.setItem('tarotUsage', JSON.stringify(usageData));
+}
+
+function initApp() {
+  if (!checkDailyLimit()) {
+    modeSelection.classList.add('hidden');
+    limitMessage.classList.remove('hidden');
+  }
+}
+initApp();
+
+// --- Mode Switching ---
+modeQuestionBtn.addEventListener('click', () => {
+  modeSelection.style.opacity = '0';
+  setTimeout(() => {
+    modeSelection.classList.add('hidden');
+    inputSection.classList.remove('hidden');
+    // small delay for css transition
+    setTimeout(() => { inputSection.style.opacity = '1'; }, 50);
+  }, 300);
 });
 
-function performReading() {
-  const userQuestion = questionInput.value.trim();
-  if (userQuestion.length === 0) {
-    questionInput.style.borderColor = 'red';
-    questionInput.placeholder = "Пожалуйста, задайте вопрос...";
-    setTimeout(() => { questionInput.style.borderColor = 'var(--gold)'; }, 1000);
-    return;
+modeDailyBtn.addEventListener('click', () => {
+  modeSelection.style.opacity = '0';
+  setTimeout(() => {
+    modeSelection.classList.add('hidden');
+    dailyCardsSection.classList.remove('hidden');
+    setTimeout(() => { dailyCardsSection.style.opacity = '1'; }, 50);
+  }, 300);
+});
+
+[backToModesBtn, backToModesBtn2].forEach(btn => {
+  btn.addEventListener('click', () => {
+    inputSection.classList.add('hidden');
+    dailyCardsSection.classList.add('hidden');
+    modeSelection.classList.remove('hidden');
+    modeSelection.style.opacity = '1';
+    questionInput.value = '';
+  });
+});
+
+closePopupBtn.addEventListener('click', () => {
+  upsellPopup.classList.remove('show');
+});
+
+// --- Reading Logic ---
+drawBtn.addEventListener('click', () => performReading('question'));
+
+questionInput.addEventListener('keypress', function(e) {
+  if (e.key === 'Enter') performReading('question');
+});
+
+miniCards.forEach(card => {
+  card.addEventListener('click', () => {
+    dailyCardsSection.style.opacity = '0';
+    setTimeout(() => {
+      dailyCardsSection.classList.add('hidden');
+      performReading('daily');
+    }, 300);
+  });
+});
+
+function scheduleUpsell() {
+  clearTimeout(upsellTimer);
+  upsellTimer = setTimeout(() => {
+    upsellPopup.classList.add('show');
+  }, 20000); // 20 seconds
+}
+
+function performReading(mode = 'question') {
+  if (!checkDailyLimit()) {
+      alert("Энергия на сегодня иссякла 🌙 Приходите завтра!");
+      return;
+  }
+  
+  let userQuestion = "";
+  let context = "general";
+  
+  if (mode === 'question') {
+    userQuestion = questionInput.value.trim();
+    if (userQuestion.length === 0) {
+      questionInput.style.borderColor = 'red';
+      questionInput.placeholder = "Пожалуйста, задайте вопрос...";
+      setTimeout(() => { questionInput.style.borderColor = 'var(--gold)'; }, 1000);
+      return;
+    }
+    context = analyzeContext(userQuestion);
+    
+    inputSection.style.opacity = '0';
+    inputSection.style.transform = 'translateY(-20px)';
+    setTimeout(() => { inputSection.classList.add('hidden'); }, 500);
   }
 
-  const context = analyzeContext(userQuestion);
-
-  inputSection.style.opacity = '0';
-  inputSection.style.transform = 'translateY(-20px)';
+  incrementDailyUsage();
   
   setTimeout(() => {
-    inputSection.classList.add('hidden');
-    inputSection.style.display = 'none';
-    
     tarotCardContainer.classList.add('visible');
     
     const randomCard = tarotDeck[Math.floor(Math.random() * tarotDeck.length)];
     const cardText = randomCard.name;
     
-    // Format response based on context
     let meaningText = "";
-    if (context === 'love') {
-      meaningText = randomCard.love ? randomCard.love : `В сфере отношений и чувств эта карта говорит о следующем: ${randomCard.meaning}`;
-    } else if (context === 'career') {
-      meaningText = randomCard.car ? randomCard.car : `В финансовых и рабочих делах эта карта указывает на: ${randomCard.meaning}`;
-    } else {
-      meaningText = randomCard.meaning;
-    }
+    if (context === 'love') meaningText = randomCard.love ? randomCard.love : `В сфере отношений: ${randomCard.meaning}`;
+    else if (context === 'career') meaningText = randomCard.car ? randomCard.car : `В финансовых делах: ${randomCard.meaning}`;
+    else meaningText = randomCard.meaning;
     
-    const contextPrefixes = {
-      love: ["На ваш вопрос о чувствах карты отвечают:", "В делах любовных Вселенная говорит:"],
-      career: ["По поводу вашей работы и финансов:", "Ваша денежная и карьерная судьба шепчет:"],
-      general: ["Карты говорят:", "Тайный знак указывает:", "Судьба отвечает вам:"]
-    };
-    const prefixArray = contextPrefixes[context];
-    const rs = prefixArray[Math.floor(Math.random() * prefixArray.length)];
+    let answerHtml = "";
+    if (mode === 'question') {
+      const pfx = {
+        love: ["На ваш вопрос о чувствах:", "В делах любовных:"],
+        career: ["По поводу вашей работы:", "Ваша карьерная судьба шепчет:"],
+        general: ["Карты говорят:", "Судьба отвечает вам:"]
+      };
+      const rs = pfx[context][Math.floor(Math.random() * pfx[context].length)];
+      answerHtml = `<em>Ваш вопрос: "${userQuestion}"</em><br><br><strong>✨ ${rs}</strong><br>${meaningText}`;
+    } else {
+      answerHtml = `<strong>✨ Подсказка на день:</strong><br>${meaningText} <br><br><em>Совет: прислушайтесь к интуиции сегодня.</em>`;
+    }
     
     setTimeout(() => {
       cardNameOverlay.innerText = cardText;
@@ -140,43 +240,38 @@ function performReading() {
       
       setTimeout(() => {
         cardTitle.innerText = `Ваша карта: ${cardText}`;
-        cardMeaning.innerHTML = `<em>Ваш вопрос: "${userQuestion}"</em><br><br><strong>✨ ${rs}</strong><br>${meaningText}`;
-        
+        cardMeaning.innerHTML = answerHtml;
         resultSection.style.display = 'block';
+        
         setTimeout(() => {
           resultSection.classList.add('visible');
-          window.scrollTo({
-             top: document.body.scrollHeight,
-             behavior: 'smooth'
-          });
+          window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+          scheduleUpsell(); // Start the 20s timer
         }, 50);
 
       }, 1000); 
     }, 1500); 
-  }, 500); 
+  }, mode === 'question' ? 500 : 50); 
 }
 
 resetBtn.addEventListener('click', () => {
-  // Hide results and un-flip card
   resultSection.classList.remove('visible');
   tarotCard.classList.remove('flipped');
+  clearTimeout(upsellTimer);
   
   setTimeout(() => {
     resultSection.style.display = 'none';
     tarotCardContainer.classList.remove('visible');
     
-    // Reset inputs
     questionInput.value = '';
-    inputSection.style.display = 'flex';
-    inputSection.classList.remove('hidden');
     
-    setTimeout(() => {
-      inputSection.style.opacity = '1';
-      inputSection.style.transform = 'translateY(0)';
-      window.scrollTo({
-             top: 0,
-             behavior: 'smooth'
-          });
-    }, 50);
+    if (!checkDailyLimit()) {
+      limitMessage.classList.remove('hidden');
+    } else {
+      modeSelection.classList.remove('hidden');
+      modeSelection.style.opacity = '1';
+    }
+    
+    setTimeout(() => { window.scrollTo({ top: 0, behavior: 'smooth' }); }, 50);
   }, 1000);
 });

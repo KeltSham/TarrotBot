@@ -28,9 +28,30 @@
     </header>
 
     <main class="main-content">
-      <div class="input-section">
+      <div id="limit-message" class="hidden">
+        <h3>Энергия на сегодня иссякла 🌙</h3>
+        <p>Вы использовали 3 бесплатных расклада. Приходите завтра или напишите тарологу Олегу для личного и более глубокого погружения!</p>
+      </div>
+
+      <div class="mode-selection" id="mode-selection">
+        <button id="mode-question-btn" class="mystic-btn">Полноценный вопрос</button>
+        <button id="mode-daily-btn" class="mystic-btn outline-btn">Карта дня</button>
+      </div>
+
+      <div class="input-section hidden" id="input-section">
         <input type="text" id="question-input" placeholder="О чем вы хотите спросить карты?..." autocomplete="off">
         <button id="draw-btn" class="mystic-btn">Сделать расклад</button>
+        <button id="back-to-modes" class="text-btn mt-1">Вернуться назад</button>
+      </div>
+      
+      <div class="daily-cards-section hidden" id="daily-cards-section">
+        <p class="daily-prompt">Выберите одну карту, чтобы получить подсказку на день:</p>
+        <div class="three-cards-container">
+          <div class="tarot-card mini" data-index="0"><div class="card-face card-back"></div></div>
+          <div class="tarot-card mini" data-index="1"><div class="card-face card-back"></div></div>
+          <div class="tarot-card mini" data-index="2"><div class="card-face card-back"></div></div>
+        </div>
+        <button id="back-to-modes-2" class="text-btn mt-2">Вернуться назад</button>
       </div>
 
       <div class="tarot-card-container">
@@ -49,6 +70,17 @@
         <div class="divider">✦</div>
         <p id="card-meaning"></p>
         <button id="reset-btn" class="mystic-btn reset-btn">Новый расклад</button>
+      </div>
+      
+      <!-- Delayed Popup -->
+      <div class="upsell-popup" id="upsell-popup">
+        <div class="upsell-content">
+          <button class="close-popup" id="close-popup">×</button>
+          <h4>Расшифровка кажется неполной? 🔮</h4>
+          <p>Остались вопросы или ситуация требует более глубокого разбора?</p>
+          <p>Олег онлайн и готов сделать полный персональный расклад специально для вас.</p>
+          <a href="https://wa.me/79211865804" target="_blank" class="mystic-btn small-btn">Написать Олегу</a>
+        </div>
       </div>
     </main>
     

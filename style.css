@@ -347,4 +347,158 @@ footer {
   .result-section { padding: 1.5rem; }
   .result-section h2 { font-size: 2rem; }
   .result-section p { font-size: 1.1rem; }
+  .three-cards-container { gap: 0.5rem; }
+  .tarot-card.mini { width: 90px; height: 140px; }
 }
+
+/* NEW FEATURES CSS */
+.hidden {
+  display: none !important;
+}
+
+.mode-selection {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+  transition: opacity 0.5s ease;
+}
+
+@media (max-width: 600px) {
+  .mode-selection { flex-direction: column; gap: 1rem; }
+}
+
+.outline-btn {
+  background: transparent;
+  border: 2px solid var(--gold);
+  color: var(--gold);
+}
+
+.outline-btn:hover {
+  background: rgba(212, 175, 55, 0.1);
+  color: #fff;
+}
+
+.text-btn {
+  background: none;
+  border: none;
+  color: var(--gold);
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.2rem;
+  cursor: pointer;
+  text-decoration: underline;
+  opacity: 0.8;
+  margin-top: 1rem;
+}
+
+.text-btn:hover {
+  opacity: 1;
+}
+
+#limit-message {
+  background: rgba(43, 8, 59, 0.9);
+  border: 1px solid #ff4d4d;
+  padding: 1.5rem;
+  border-radius: 12px;
+  color: white;
+  margin-bottom: 2rem;
+  max-width: 600px;
+}
+
+#limit-message h3 { color: #ff9999; margin-bottom: 0.5rem; }
+
+.daily-cards-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.daily-prompt {
+  font-size: 1.4rem;
+  color: var(--gold);
+  margin-bottom: 1rem;
+}
+
+.three-cards-container {
+  display: flex;
+  gap: 1.5rem;
+  justify-content: center;
+}
+
+.tarot-card.mini {
+  width: 120px;
+  height: 190px;
+  box-shadow: 0 10px 20px rgba(0,0,0,0.6), 0 0 15px rgba(212, 175, 55, 0.2);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.tarot-card.mini:hover {
+  transform: translateY(-10px) scale(1.05);
+  box-shadow: 0 15px 30px rgba(0,0,0,0.8), 0 0 25px rgba(212, 175, 55, 0.5);
+}
+
+.upsell-popup {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.5s ease;
+  backdrop-filter: blur(5px);
+}
+
+.upsell-popup.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.upsell-content {
+  background: var(--secondary-color);
+  padding: 2.5rem;
+  border-radius: 15px;
+  border: 1px solid var(--gold);
+  max-width: 450px;
+  text-align: center;
+  position: relative;
+  box-shadow: 0 10px 40px rgba(212, 175, 55, 0.3);
+  transform: translateY(20px);
+  transition: transform 0.5s ease;
+}
+
+.upsell-popup.show .upsell-content {
+  transform: translateY(0);
+}
+
+.upsell-content h4 {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.8rem;
+  color: var(--gold);
+  margin-bottom: 1rem;
+}
+
+.upsell-content p {
+  color: var(--text-bright);
+  margin-bottom: 1rem;
+  font-size: 1.1rem;
+}
+
+.small-btn {
+  font-size: 1rem;
+  padding: 0.6rem 2rem;
+  margin-top: 1rem;
+}
+
+.close-popup {
+  position: absolute;
+  top: 10px; right: 15px;
+  background: none; border: none;
+  font-size: 2rem;
+  color: var(--gold);
+  cursor: pointer;
+  opacity: 0.7;
+}
+.close-popup:hover { opacity: 1; }
