@@ -184,10 +184,7 @@ h1 {
   border-radius: 12px;
 }
 
-.tarot-card.flipped {
-  transform: rotateY(180deg);
-  animation: none; /* stop floating after flip */
-}
+
 
 .card-face {
   width: 100%;
@@ -205,28 +202,101 @@ h1 {
 }
 
 .card-front {
-  background-image: url('images/tarot_front_blank_1774882898806.png');
   transform: rotateY(180deg);
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  justify-content: space-between;
   align-items: center;
   text-align: center;
-  padding: 15px;
+  padding: 10px 8px;
   position: relative;
+  overflow: hidden;
+  background: linear-gradient(160deg, #1a0433 0%, #0b0213 60%, #1a0433 100%);
 }
 
-.card-overlay-text {
-  background: rgba(11, 2, 19, 0.85);
-  border: 1px solid var(--gold);
-  border-radius: 8px;
-  padding: 1rem 0.5rem;
-  width: 85%;
+.card-name-top {
   font-family: 'Playfair Display', serif;
-  font-size: 1.5rem;
-  color: var(--gold);
+  font-size: 0.72rem;
   text-transform: uppercase;
-  backdrop-filter: blur(4px);
-  text-shadow: 0 0 5px rgba(212, 175, 55, 0.5);
+  letter-spacing: 2px;
+  opacity: 0.7;
+  width: 100%;
+  border-bottom: 1px solid currentColor;
+  padding-bottom: 5px;
+  flex-shrink: 0;
+}
+
+.card-arcana-symbol {
+  font-size: 3.8rem;
+  line-height: 1;
+  filter: drop-shadow(0 0 14px currentColor);
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card-center-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 4px;
+  width: 70%;
+  flex: 1;
+  place-items: center;
+}
+
+.card-center-grid span {
+  font-size: 1.4rem;
+  filter: drop-shadow(0 0 6px currentColor);
+}
+
+.card-name-bottom {
+  font-family: 'Playfair Display', serif;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  text-shadow: 0 0 8px currentColor;
+  flex-shrink: 0;
+  padding: 5px 4px;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  width: 100%;
+  background: rgba(0,0,0,0.5);
+}
+
+.card-inner-border {
+  position: absolute;
+  inset: 4px;
+  border: 1px solid currentColor;
+  border-radius: 9px;
+  opacity: 0.25;
+  pointer-events: none;
+}
+
+@keyframes cardRevealShimmer {
+  0%   { box-shadow: 0 0 0 rgba(212,175,55,0); }
+  40%  { box-shadow: 0 0 40px rgba(212,175,55,0.8), 0 0 80px rgba(212,175,55,0.4); }
+  100% { box-shadow: 0 20px 40px rgba(0,0,0,0.8), 0 0 30px rgba(212,175,55,0.3); }
+}
+
+.tarot-card.flipped {
+  transform: rotateY(180deg);
+  animation: cardRevealShimmer 1.5s ease-out forwards;
+}
+
+@keyframes fadeInText {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.result-section.visible #card-title {
+  animation: fadeInText 0.6s ease-out 0.1s both;
+}
+
+.result-section.visible #card-meaning {
+  animation: fadeInText 0.8s ease-out 0.4s both;
 }
 
 .result-section {

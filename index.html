@@ -18,7 +18,7 @@
   <link rel="stylesheet" href="style.css">
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
 </head>
-<body>
+<body style="background-color: #0b0213;">
   <div class="background-overlay"></div>
   <div class="container">
     <header class="header">
@@ -62,15 +62,15 @@
         <div class="three-spread-container" id="three-spread-container">
            <!-- Dynamically populated or statically nested -->
            <div class="spread-item">
-             <div class="tarot-card-container"><div class="tarot-card" id="tc-0"><div class="card-face card-back"></div><div class="card-face card-front"><div class="card-overlay-text" id="tname-0"></div></div></div></div>
+             <div class="tarot-card-container"><div class="tarot-card" id="tc-0"><div class="card-face card-back"></div><div class="card-face card-front"></div></div></div>
              <p class="spread-title" style="color:var(--gold); margin-top:1rem;">Прошлое</p>
            </div>
            <div class="spread-item">
-             <div class="tarot-card-container"><div class="tarot-card" id="tc-1"><div class="card-face card-back"></div><div class="card-face card-front"><div class="card-overlay-text" id="tname-1"></div></div></div></div>
+             <div class="tarot-card-container"><div class="tarot-card" id="tc-1"><div class="card-face card-back"></div><div class="card-face card-front"></div></div></div>
              <p class="spread-title" style="color:var(--gold); margin-top:1rem;">Настоящее</p>
            </div>
            <div class="spread-item">
-             <div class="tarot-card-container"><div class="tarot-card" id="tc-2"><div class="card-face card-back"></div><div class="card-face card-front"><div class="card-overlay-text" id="tname-2"></div></div></div></div>
+             <div class="tarot-card-container"><div class="tarot-card" id="tc-2"><div class="card-face card-back"></div><div class="card-face card-front"></div></div></div>
              <p class="spread-title" style="color:var(--gold); margin-top:1rem;">Будущее</p>
            </div>
         </div>
@@ -86,12 +86,8 @@
 
       <div class="tarot-card-container">
         <div class="tarot-card" id="tarot-card">
-          <div class="card-face card-back">
-            <!-- Background from CSS -->
-          </div>
-          <div class="card-face card-front">
-             <div class="card-overlay-text" id="card-name-overlay"></div>
-          </div>
+          <div class="card-face card-back"></div>
+          <div class="card-face card-front"></div>
         </div>
       </div>
 
@@ -125,6 +121,6 @@
       <div class="esoteric-symbols-bottom">⟡ ⟡ ⟡</div>
     </footer>
   </div>
-  <script src="script.js?v=2"></script>
+  <script src="script.js?v=6"></script>
 </body>
 </html>

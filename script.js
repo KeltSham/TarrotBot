@@ -1,3 +1,12 @@
+// =============================================
+// TELEGRAM MINI APP INITIALIZATION (REQUIRED!)
+// Without ready(), Telegram shows a white/loading screen
+// =============================================
+if (window.Telegram && window.Telegram.WebApp) {
+  window.Telegram.WebApp.ready();   // Tell Telegram app is ready to show
+  window.Telegram.WebApp.expand();  // Expand to full screen height
+}
+
 const tarotDeck = [
   // Major Arcana
   { name: "Шут (0)", meaning: "Новое начало, спонтанность, вера во Вселенную. Пора сделать шаг в неизвестность.", tip: "Совет: рискните попробовать совершенно новое и не бойтесь показаться смешным сегодня." },
@@ -73,7 +82,55 @@ function analyzeContext(question) {
   }
 }
 
+// === CARD FACE BUILDER ===
+const suitConfig = {
+  'Жезлов':   { color: '#ff7b2e', emoji: '🪄', grid: ['🔥','✨','🌿','⚡'] },
+  'Кубков':   { color: '#5fd4f4', emoji: '🏆', grid: ['💧','🌙','💙','✦'] },
+  'Мечей':    { color: '#c0c9e8', emoji: '⚔️', grid: ['💨','🌪','🌫','❄️'] },
+  'Пентаклей':{ color: '#7ed957', emoji: '⭐', grid: ['🌿','💰','🍀','🌱'] },
+};
+const majorSymbols = ['☆','🌙','✦','☀','♦','♥','🌟','⚡','💫','☯','🔮','🌀','☠','⚖','♾','😈','🗼','⭐','🌕','☀️','🔔','🌍'];
+
+function buildCardFace(cardName, containerEl) {
+  const front = containerEl.querySelector('.card-front');
+  if (!front) return;
+
+  // Detect suit
+  let color = '#d4af37'; // default gold for Major Arcana
+  let symbol = '';
+  let centerHtml = '';
+  let found = false;
+
+  for (const [suit, cfg] of Object.entries(suitConfig)) {
+    if (cardName.includes(suit)) {
+      color = cfg.color;
+      symbol = `<div class="card-arcana-symbol" style="color:${color}">${cfg.emoji}</div>`;
+      centerHtml = `<div class="card-center-grid" style="color:${color}">${cfg.grid.map(e=>`<span>${e}</span>`).join('')}</div>`;
+      found = true;
+      break;
+    }
+  }
+
+  if (!found) {
+    // Major Arcana - extract number
+    const idx = tarotDeck.findIndex(c => c.name === cardName);
+    const sym = majorSymbols[idx >= 0 ? idx % majorSymbols.length : 0] || '✦';
+    symbol = `<div class="card-arcana-symbol" style="color:${color}; font-size: 4rem;">${sym}</div>`;
+    centerHtml = `<div class="card-arcana-symbol" style="color:${color}; font-size:1.8rem; flex:none;">✧ АРКАН ✧</div>`;
+  }
+
+  front.style.color = color;
+  front.innerHTML = `
+    <div class="card-inner-border" style="border-color:${color}"></div>
+    <div class="card-name-top" style="color:${color}">${cardName}</div>
+    ${symbol}
+    ${centerHtml}
+    <div class="card-name-bottom" style="color:${color}; border-color:${color}">${cardName}</div>
+  `;
+}
+
 // Select Elements
+
 const drawBtn = document.getElementById('draw-btn');
 const resetBtn = document.getElementById('reset-btn');
 const inputSection = document.getElementById('input-section');
@@ -82,7 +139,6 @@ const tarotCardContainer = document.querySelector('.tarot-card-container');
 const tarotCard = document.getElementById('tarot-card');
 const resultSection = document.getElementById('result-section');
 
-const cardNameOverlay = document.getElementById('card-name-overlay');
 const cardTitle = document.getElementById('card-title');
 const cardMeaning = document.getElementById('card-meaning');
 
@@ -270,7 +326,7 @@ function performReading(mode = 'question') {
     }
     
     setTimeout(() => {
-      cardNameOverlay.innerText = cardText;
+      buildCardFace(cardText, tarotCard);
       tarotCard.classList.add('flipped');
       if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
           window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
@@ -343,8 +399,11 @@ drawThreeBtn.addEventListener('click', () => {
   // Flip sequence
   picked.forEach((card, index) => {
       setTimeout(() => {
-          document.getElementById(`tname-${index}`).innerText = card.name;
-          document.getElementById(`tc-${index}`).classList.add('flipped');
+          const cardEl = document.getElementById(`tc-${index}`);
+          buildCardFace(card.name, cardEl);
+          const tnameEl = document.getElementById(`tname-${index}`);
+          if (tnameEl) tnameEl.innerText = '';
+          cardEl.classList.add('flipped');
           
           if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
               window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
