@@ -2,8 +2,8 @@
 users.db
 *.sqlite
 
-# Secret configuration containing Tokens
-bot.py
+# Secrets and environment configurations
+.env
 
 # Python generated files
 __pycache__/

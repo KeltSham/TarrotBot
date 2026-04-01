@@ -277,17 +277,30 @@ function performReading(mode = 'question') {
       }
       
       setTimeout(() => {
+        let wordCount = answerHtml.split(/\s+/).length;
+        let delayMs = Math.max(10000, Math.min(20000, wordCount * 350));
+        
         cardTitle.innerText = `Ваша карта: ${cardText}`;
-        cardMeaning.innerHTML = answerHtml;
+        cardMeaning.innerHTML = `<strong>✨ Знаки сплетаются воедино... Считываю энергии и формирую персональный ответ, пожалуйста, подождите...</strong>`;
         resultSection.style.display = 'block';
         
         setTimeout(() => {
           resultSection.classList.add('visible');
           window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-          scheduleUpsell(); // Start the 20s timer
         }, 50);
+        
+        // Show actual reading after dynamic delay
+        setTimeout(() => {
+           cardMeaning.style.opacity = '0';
+           setTimeout(() => {
+               cardMeaning.innerHTML = answerHtml;
+               cardMeaning.style.opacity = '1';
+               window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+               scheduleUpsell(); 
+           }, 500);
+        }, delayMs);
 
-      }, 1000); 
+      }, 1000);
     }, 1500); 
   }, mode === 'question' ? 500 : 50); 
 }
@@ -339,11 +352,22 @@ drawThreeBtn.addEventListener('click', () => {
           
           if (index === 2) {
              setTimeout(() => {
-                 document.getElementById('t-meaning-0').innerHTML = `<strong>Прошлое (${picked[0].name}):</strong><br>${picked[0].meaning}`;
-                 document.getElementById('t-meaning-1').innerHTML = `<strong>Настоящее (${picked[1].name}):</strong><br>${picked[1].meaning}`;
-                 document.getElementById('t-meaning-2').innerHTML = `<strong>Будущее (${picked[2].name}):</strong><br>${picked[2].meaning}`;
+                 let combinedHtml = `${picked[0].meaning} ${picked[1].meaning} ${picked[2].meaning}`;
+                 let wordCount = combinedHtml.split(/\s+/).length;
+                 let delayMs = Math.max(10000, Math.min(20000, wordCount * 250));
+                 
+                 document.getElementById('t-meaning-0').innerHTML = `<strong>🔮 Считываю линии прошлого...</strong>`;
+                 document.getElementById('t-meaning-1').innerHTML = `<strong>🔮 Анализирую вибрации настоящего...</strong>`;
+                 document.getElementById('t-meaning-2').innerHTML = `<strong>🔮 Выстраиваю вероятности будущего...</strong>`;
                  threeResultSection.classList.remove('hidden');
                  window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+                 
+                 setTimeout(() => {
+                     document.getElementById('t-meaning-0').innerHTML = `<strong>Прошлое (${picked[0].name}):</strong><br>${picked[0].meaning}`;
+                     document.getElementById('t-meaning-1').innerHTML = `<strong>Настоящее (${picked[1].name}):</strong><br>${picked[1].meaning}`;
+                     document.getElementById('t-meaning-2').innerHTML = `<strong>Будущее (${picked[2].name}):</strong><br>${picked[2].meaning}`;
+                     window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+                 }, delayMs);
              }, 1000);
           }
       }, index * 800);
