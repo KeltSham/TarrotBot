@@ -4,19 +4,34 @@ import sqlite3
 import datetime
 import threading
 import time
-
+import logging
 import os
 from dotenv import load_dotenv
 
 load_dotenv()
 
+# --- Логирование ---
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    handlers=[
+        logging.FileHandler('bot.log', encoding='utf-8'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
+
 # --- НАСТРОЙКИ ---
-TOKEN = os.getenv("BOT_TOKEN") 
-WEB_APP_URL = "https://KeltSham.github.io/TarrotBot/"
-ADMIN_ID = int(os.getenv("ADMIN_ID", "1491094235"))
+TOKEN = os.getenv("BOT_TOKEN")
+if not TOKEN:
+    raise ValueError("BOT_TOKEN не задан в .env файле!")
+
+WEB_APP_URL = os.getenv("WEB_APP_URL", "https://KeltSham.github.io/TarrotBot/").rstrip("/")
+ADMIN_ID = int(os.getenv("ADMIN_ID"))
 # -----------------
 
 bot = telebot.TeleBot(TOKEN)
+logger.info("Бот инициализирован.")
 
 # Инициализация Базы Данных SQLite
 conn = sqlite3.connect('users.db', check_same_thread=False)
@@ -246,7 +261,7 @@ def start_msg(message):
     access, status_info, is_paid = has_access(user_id)
     
     if access:
-        base_url = f"{WEB_APP_URL}?v=4"
+        base_url = f"{WEB_APP_URL}?v=6"
         url = f"{base_url}&premium=1" if is_paid else base_url
         markup = InlineKeyboardMarkup(row_width=1)
         markup.add(InlineKeyboardButton("✨ Открыть Расклад", web_app=WebAppInfo(url=url)))
@@ -298,25 +313,34 @@ def push_scheduler():
         # Рассылка ровно в 10:00 утра
         if now.hour == 10 and now.minute == 0:
             users = get_all_users()
+            logger.info(f"Запуск утренней рассылки для {len(users)} пользователей.")
             for u in users:
                 uid, trial, sub, push_enabled = u[0], u[1], u[2], u[3] if len(u) > 3 else 1
                 if push_enabled == 1:
                     acc, _, is_p = has_access(uid)
                     if acc:
-                        base_url = f"{WEB_APP_URL}?v=4"
+                        base_url = f"{WEB_APP_URL}?v=6"
                         url = f"{base_url}&premium=1" if is_p else base_url
                         markup = InlineKeyboardMarkup()
                         markup.add(InlineKeyboardButton("🔮 Открыть Карту Дня", web_app=WebAppInfo(url=url)))
                         try:
                             bot.send_message(uid, "✨ Доброе утро! Карты говорят, у Вселенной есть послание для вас...\nЗаберите свою бесплатную Карту Дня!", reply_markup=markup)
-                        except Exception:
-                            pass
-            time.sleep(60) # Спим 60 секунд, чтобы не отправить дважды в ту же минуту
-        time.sleep(30) # Проверяем время каждые 30 секунд
+                        except telebot.apihelper.ApiTelegramException as e:
+                            if 'bot was blocked' in str(e) or 'user is deactivated' in str(e):
+                                logger.warning(f"Пользователь {uid} заблокировал бота. Отключаю push.")
+                                with conn:
+                                    conn.execute('UPDATE users SET push_enabled = 0 WHERE user_id = ?', (uid,))
+                            else:
+                                logger.error(f"Ошибка отправки пользователю {uid}: {e}")
+                        except Exception as e:
+                            logger.error(f"Неожиданная ошибка для {uid}: {e}")
+                        time.sleep(0.05)  # Защита от Flood Control Telegram
+            time.sleep(60)  # Спим 60 секунд, чтобы не отправить дважды в ту же минуту
+        time.sleep(30)  # Проверяем время каждые 30 секунд
 
 threading.Thread(target=push_scheduler, daemon=True).start()
 
-print("Бот успешно запущен (с меню команд, пушами и премиум 3-card)! Ожидаю сообщений от пользователей...")
+logger.info("Бот успешно запущен (с меню команд, пушами и премиум 3-card)! Ожидаю сообщений от пользователей...")
 if __name__ == '__main__':
     bot.set_my_commands([
         telebot.types.BotCommand("/start", "🔮 Запустить расклад"),
