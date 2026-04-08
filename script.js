@@ -1035,11 +1035,16 @@ function _openShareLink(text) {
   }
 }
 
-function scheduleUpsell() {
+function scheduleUpsell(textToRead = "") {
   clearTimeout(upsellTimer);
+  // Подсчёт слов (убираем пустые)
+  const wordCount = textToRead.split(/\s+/).filter(Boolean).length;
+  // Человек читает ~3 слова в секунду. Плюс 4 секунды "на паузу" (минимум 8 сек)
+  const delaySeconds = Math.max(8, (wordCount / 3) + 4);
+  
   upsellTimer = setTimeout(() => {
     upsellPopup.classList.add('show');
-  }, 20000);
+  }, delaySeconds * 1000);
 }
 
 /** Показывает плашку-footer через 5 или 8 секунд после отображения текста. */
@@ -1181,7 +1186,7 @@ async function performReading(mode = 'question') {
             cardMeaning.innerHTML     = answerHtml;
             cardMeaning.style.opacity = '1';
             window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-            scheduleUpsell();
+            scheduleUpsell(answerHtml);
             // Сохраняем расклад в историю (Premium — сервер сам фильтрует)
             saveReading(randomCard.name, meaningText, mode);
 
