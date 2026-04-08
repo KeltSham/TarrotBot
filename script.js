@@ -663,9 +663,14 @@ const threePopupBuyStars = document.getElementById('three-popup-buy-stars');
 closeThreePopup.addEventListener('click', () => threePremiumPopup.classList.remove('show'));
 threePopupBuyStars.addEventListener('click', () => {
   threePremiumPopup.classList.remove('show');
-  // Открываем бот для оплаты через Telegram.WebApp.openTelegramLink
-  if (window.Telegram?.WebApp?.openTelegramLink) {
-    window.Telegram.WebApp.openTelegramLink('https://t.me/' + (window.Telegram.WebApp.initDataUnsafe?.bot?.username || ''));
+  if (window.Telegram?.WebApp) {
+    if (window.Telegram.WebApp.showAlert) {
+      window.Telegram.WebApp.showAlert('Для оплаты вернитесь в чат с ботом и нажмите кнопку "Купить Premium" (или отправьте команду /buy). Наш бот моментально выставит счет в Звездах!', () => {
+        window.Telegram.WebApp.close();
+      });
+    } else {
+      window.Telegram.WebApp.close();
+    }
   }
 });
 
@@ -1056,7 +1061,13 @@ function _showResultFooter(card, mode) {
   // Кнопка «Поделиться»
   shareBtn.textContent = '📤 Поделиться раскладом';
   shareBtn.onclick = () => {
-    const shareText = `🔮 Карта Таро: ${card.name}\n\n${card.meaning}\n\n${card.tip}`;
+    const botUser   = window.Telegram?.WebApp?.initDataUnsafe?.bot?.username || 'KeltTarotBot';
+    const userId    = window.Telegram?.WebApp?.initDataUnsafe?.user?.id || '';
+    const botUrl    = userId ? `https://t.me/${botUser}?start=${userId}` : `https://t.me/${botUser}`;
+    
+    // Короткая аннотация (совет карты) + реферальная ссылка
+    const shareText = `🔮 Моя карта Таро на сегодня: ${card.name}\n\n"${card.tip}"\n\nСделай свой расклад здесь: ${botUrl}`;
+    
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(shareText).then(() => {
         shareBtn.textContent = '✅ Скопировано!';
