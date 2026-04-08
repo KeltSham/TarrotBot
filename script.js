@@ -703,7 +703,7 @@ threePopupBuyStars.addEventListener('click', () => {
     ["🌘", "Тёмная луна — береги силы, время тишины"],
   ];
   const el = document.getElementById('moon-phase-bar');
-  if (el) el.textContent = phases[idx][0] + ' ' + phases[idx][1];
+  if (el) el.innerHTML = `<span class="moon-emoji">${phases[idx][0]}</span> ${phases[idx][1]}`;
 })();
 
 // =============================================

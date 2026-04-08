@@ -57,6 +57,14 @@ body {
   letter-spacing: 0.5rem;
   margin-bottom: 1rem;
   text-shadow: 0 0 15px rgba(212, 175, 55, 0.5);
+  animation: mysticBreathing 4s ease-in-out infinite;
+  display: inline-block;
+}
+
+@keyframes mysticBreathing {
+  0% { transform: scale(1); opacity: 0.8; text-shadow: 0 0 10px rgba(212,175,55,0.4); }
+  50% { transform: scale(1.05); opacity: 1; text-shadow: 0 0 25px rgba(212,175,55,0.8), 0 0 10px rgba(185,154,255,0.4); }
+  100% { transform: scale(1); opacity: 0.8; text-shadow: 0 0 10px rgba(212,175,55,0.4); }
 }
 
 h1 {
@@ -384,6 +392,21 @@ h1 {
   letter-spacing: 0.05em;
   margin: 0.4rem 0 0;
   opacity: 0.9;
+}
+
+.moon-emoji {
+  display: inline-block;
+  animation: moonHeartbeat 2.5s infinite;
+  transform-origin: center;
+}
+
+@keyframes moonHeartbeat {
+  0%   { transform: scale(1); filter: drop-shadow(0 0 2px rgba(255,255,255,0.2)); }
+  10%  { transform: scale(1.15); filter: drop-shadow(0 0 8px rgba(255,255,255,0.7)); }
+  20%  { transform: scale(1); filter: drop-shadow(0 0 2px rgba(255,255,255,0.2)); }
+  30%  { transform: scale(1.15); filter: drop-shadow(0 0 8px rgba(255,255,255,0.7)); }
+  40%  { transform: scale(1); filter: drop-shadow(0 0 2px rgba(255,255,255,0.2)); }
+  100% { transform: scale(1); filter: drop-shadow(0 0 2px rgba(255,255,255,0.2)); }
 }
 
 /* Countdown timer */
