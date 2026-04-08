@@ -22,6 +22,7 @@
   <div class="background-overlay"></div>
   <div class="container">
     <header class="header">
+      <p id="moon-phase-bar" class="moon-phase-bar"></p>
       <div class="esoteric-symbols">✧ ☾ ☼ ☽ ✧</div>
       <h1>Тайны Вселенной</h1>
       <p>Задайте свой сокровенный вопрос картам Таро</p>
@@ -31,12 +32,17 @@
       <div id="limit-message" class="hidden">
         <h3>Энергия на сегодня иссякла 🌙</h3>
         <p>Вы использовали 3 бесплатных расклада. Приходите завтра или напишите тарологу Олегу для личного и более глубокого погружения!</p>
+        <div class="countdown-container">
+          <p class="countdown-label">⏳ Следующая бесплатная карта через</p>
+          <div id="countdown-timer" class="countdown-timer">—</div>
+        </div>
       </div>
 
       <div class="mode-selection" id="mode-selection">
         <button id="mode-question-btn" class="mystic-btn">Полноценный вопрос</button>
         <button id="mode-daily-btn" class="mystic-btn outline-btn">Карта дня</button>
-        <button id="mode-three-btn" class="mystic-btn outline-btn hidden" style="border-color:#b99aff; color:#b99aff; box-shadow: 0 0 10px #b99aff;">💎 3 Карты (Premium)</button>
+        <button id="mode-three-btn" class="mystic-btn outline-btn" style="border-color:#b99aff; color:#b99aff; box-shadow: 0 0 10px #b99aff;">💎 3 Карты (Premium)</button>
+        <button id="mode-history-btn" class="mystic-btn outline-btn hidden" style="border-color:#d4af37; color:#d4af37; box-shadow: 0 0 10px rgba(212,175,55,0.4); font-size:0.9rem;">📜 История раскладов</button>
       </div>
 
       <div class="input-section hidden" id="input-section">
@@ -56,7 +62,8 @@
       </div>
       
       <div class="three-reading-section hidden" id="three-reading-section">
-        <h3 style="color:var(--gold); margin-bottom: 2rem;">Прошлое, Настоящее, Будущее</h3>
+        <h3 style="color:var(--gold); margin-bottom: 1rem;">Прошлое, Настоящее, Будущее</h3>
+
         <button id="draw-three-btn" class="mystic-btn mb-2">Разложить Карты</button>
         
         <div class="three-spread-container" id="three-spread-container">
@@ -84,7 +91,14 @@
         <button id="back-to-modes-3" class="text-btn mt-2">Вернуться назад</button>
       </div>
 
-      <div class="tarot-card-container">
+      <!-- История раскладов (Premium) -->
+      <div class="history-section hidden" id="history-section">
+        <h3>📜 История раскладов</h3>
+        <div id="history-list"><p class="history-empty">⏳ Загружаю историю...</p></div>
+        <button id="back-to-modes-history" class="text-btn mt-2">← Вернуться назад</button>
+      </div>
+
+      <div class="tarot-card-container" id="main-card-container">
         <div class="tarot-card" id="tarot-card">
           <div class="card-face card-back"></div>
           <div class="card-face card-front"></div>
@@ -95,9 +109,28 @@
         <h2 id="card-title"></h2>
         <div class="divider">✦</div>
         <p id="card-meaning"></p>
-        <button id="reset-btn" class="mystic-btn reset-btn">Новый расклад</button>
+
+        <!-- Плашка появляется через 5/8 сек после показа текста -->
+        <div id="result-footer" class="result-footer hidden">
+          <button id="share-btn" class="mystic-btn share-btn">📤 Поделиться раскладом</button>
+          <button id="stories-btn" class="mystic-btn stories-btn hidden">📖 Поделиться в Stories</button>
+          <button id="reset-btn" class="mystic-btn reset-btn">Новый расклад</button>
+        </div>
       </div>
       
+      <!-- Premium-upsell popup для кнопки «3 карты» (non-premium) -->
+      <div class="upsell-popup" id="three-premium-popup">
+        <div class="upsell-content">
+          <button class="close-popup" id="close-three-popup">×</button>
+          <h4>💎 Premium расклад</h4>
+          <p>Этот глубокий расклад доступен только в Premium-версии.<br>Хотите открыть все тайны карт?</p>
+          <div style="margin-top:1.2rem; display:flex; flex-direction:column; gap:0.7rem;">
+            <button id="three-popup-buy-stars" class="mystic-btn" style="font-size:0.95rem;">⭐ Оплатить Звёздами</button>
+            <a href="https://t.me/kelt_sham?text=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5%2C+%D1%85%D0%BE%D1%87%D1%83+%D0%BF%D1%80%D0%B8%D0%BE%D0%B1%D1%80%D0%B5%D1%81%D1%82%D0%B8+Premium+%D0%B2+%D0%B1%D0%BE%D1%82%D0%B5+%D0%A2%D0%B0%D1%80%D0%BE" target="_blank" class="mystic-btn outline-btn" style="font-size:0.95rem; text-align:center;">💬 Написать Олегу</a>
+          </div>
+        </div>
+      </div>
+
       <!-- Delayed Popup -->
       <div class="upsell-popup" id="upsell-popup">
         <div class="upsell-content">
