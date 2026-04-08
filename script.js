@@ -681,8 +681,8 @@ threePopupBuyStars.addEventListener('click', () => {
   const knownNew = new Date('2000-01-06T18:14:00Z').getTime();
   const cycle    = 29.53058867 * 86400000;   // мс
   const frac     = ((Date.now() - knownNew) % cycle) / cycle;
-  // Центрируем фазы вокруг реальных астрономических точек (±0.03 цикла ≈ ±0.9 дня)
-  const T = 0.03;
+  // Центрируем фазы вокруг реальных астрономических точек (±0.017 цикла ≈ ±0.5 дня)
+  const T = 0.017;
   let idx;
   if      (frac < T || frac > 1 - T)        idx = 0; // новолуние
   else if (frac < 0.25 - T)                 idx = 1; // растущий серп
