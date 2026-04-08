@@ -1039,8 +1039,8 @@ function scheduleUpsell(textToRead = "") {
   clearTimeout(upsellTimer);
   // Подсчёт слов (убираем пустые)
   const wordCount = textToRead.split(/\s+/).filter(Boolean).length;
-  // Человек читает ~3 слова в секунду. Плюс 4 секунды "на паузу" (минимум 8 сек)
-  const delaySeconds = Math.max(8, (wordCount / 3) + 4);
+  // Человек читает ~3 слова в секунду. Плюс 2 секунды "на паузу" (минимум 8 сек)
+  const delaySeconds = Math.max(8, (wordCount / 3) + 2);
   
   upsellTimer = setTimeout(() => {
     upsellPopup.classList.add('show');
@@ -1177,7 +1177,7 @@ async function performReading(mode = 'question') {
 
         setTimeout(() => {
           resultSection.classList.add('visible');
-          window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+          // Убрали автоскролл здесь, чтобы карта не дергалась во время переворота
         }, 50);
 
         setTimeout(() => {
@@ -1185,7 +1185,9 @@ async function performReading(mode = 'question') {
           setTimeout(() => {
             cardMeaning.innerHTML     = answerHtml;
             cardMeaning.style.opacity = '1';
-            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+            // Мягко скроллим к началу текста, а не в самый подвал
+            resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            
             scheduleUpsell(answerHtml);
             // Сохраняем расклад в историю (Premium — сервер сам фильтрует)
             saveReading(randomCard.name, meaningText, mode);
@@ -1193,7 +1195,7 @@ async function performReading(mode = 'question') {
             // Плашка с кнопками — через 5 или 8 секунд после текста
             setTimeout(() => {
               _showResultFooter(randomCard, mode);
-              window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+              // Убрали автоскролл в подвал
             }, footerDelayMs);
           }, 500);
         }, delayMs);
