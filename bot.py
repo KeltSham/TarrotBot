@@ -360,8 +360,11 @@ def check_and_increment_limit(user_id, service_type, tz_offset: int = None):
     _, _, is_paid = has_access(user_id)
     limit   = _get_daily_limit(is_paid, user_id)
     current = get_daily_count(user_id)
+    
+    logger.info(f"[LIMIT CHECK] User: {user_id} | IsPaid: {is_paid} | Limit: {limit} | Current: {current}")
 
     if current >= limit:
+        logger.info(f"[LIMIT REACHED] User: {user_id} | Limit: {limit} | Current: {current}")
         return False
 
     today = get_user_local_date(user_id)
@@ -370,6 +373,7 @@ def check_and_increment_limit(user_id, service_type, tz_offset: int = None):
             'INSERT INTO usage_log (user_id, date, service_type) VALUES (?, ?, ?)',
             (user_id, today, service_type)
         )
+    logger.info(f"[LIMIT OK] User: {user_id} | Service: {service_type} | Count: {current + 1}")
     return True
 
 _INIT_DATA_MAX_AGE = 7 * 24 * 3600   # initData считается валидным 7 дней
@@ -459,9 +463,9 @@ def update_subscription(user_id, days=30):
 def has_access(user_id):
     user = get_user(user_id)
     if not user:
-        return False, "Not registered", False
+        return False, "Вы не зарегистрированы. Пожалуйста, отправьте /start в боте.", False
 
-    now = datetime.datetime.utcnow()  # UTC: согласуется с add_user/update_subscription
+    now = datetime.datetime.utcnow() 
 
     try:
         trial_end = datetime.datetime.fromisoformat(user[0]) if user[0] else datetime.datetime.min
@@ -476,9 +480,11 @@ def has_access(user_id):
             pass
 
     if sub_end and sub_end > now:
-        return True, f"Активная подписка (осталось {(sub_end - now).days} дней)", True
+        days_left = (sub_end - now).days
+        return True, f"Активная подписка (осталось {days_left} дней)", True
     if trial_end > now:
-        return True, f"Пробный Премиум-доступ (осталось {(trial_end - now).days} дней)", True
+        days_left = (trial_end - now).days
+        return True, f"Пробный Премиум-доступ (осталось {days_left} дней)", True
 
     return True, f"У вас Базовый тариф ({LIMIT_FREE} расклада в день)", False
 

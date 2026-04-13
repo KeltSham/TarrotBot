@@ -960,9 +960,9 @@ async function _loadUsage() {
 
 /** Проверяет — можно ли сделать ещё один расклад (любого типа). */
 function checkLimit() {
+  if (isPremium) return true; // Премиуму доверяем всегда
   if (apiUrl) return !_serverStatus.limit_reached;
-  const limit = isPremium ? PREMIUM_LIMIT : FREE_LIMIT;
-  return _localUsage.count < limit;
+  return _localUsage.count < FREE_LIMIT;
 }
 
 function incrementLocalUsage() {
