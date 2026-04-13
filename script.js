@@ -776,12 +776,8 @@ const storiesBtn         = document.getElementById('stories-btn');
 const themeToggle        = document.getElementById('theme-toggle');
 const themeIcon          = themeToggle ? themeToggle.querySelector('.theme-icon') : null;
 
-// На случай если кнопки Stories нет в HTML, но мы её используем
-if (storiesBtn) {
-  if (window.Telegram?.WebApp?.shareToStories) {
-    storiesBtn.classList.remove('hidden');
-  }
-}
+// Кнопка Stories инициализируется — видимость управляется в _showResultFooter
+// (показывается только для режима 'daily')
 
 // =============================================
 // PREMIUM CHECK
@@ -1256,11 +1252,9 @@ function _showResultFooter(card, mode) {
     }
   };
 
-  // Кнопка Stories — только для «Карты дня» и только если API доступен
-  if (mode === 'daily' && window.Telegram?.WebApp?.shareToStories) {
+  // Кнопка Stories — только для «Карты дня»
+  if (mode === 'daily') {
     storiesBtn.classList.remove('hidden');
-    // Мы не назначаем здесь onclick, так как в конце файла есть глобальный 
-    // listener, который генерирует красивую картинку через Canvas
   } else {
     storiesBtn.classList.add('hidden');
   }
@@ -1575,11 +1569,14 @@ if (storiesBtn) {
       storiesBtn.textContent = '⏳ Генерирую...';
       const imageData = await generateStoryImage(lastDrawnCard, lastDrawnMeaning || cardMeaning.textContent);
       
-      if (window.Telegram?.WebApp?.shareToStories) {
-        window.Telegram.WebApp.shareToStories(imageData, {
+      if (window.Telegram?.WebApp?.shareToStory) {
+        window.Telegram.WebApp.shareToStory(imageData, {
           text: 'Мой расклад дня в Тайны Вселенной 🔮',
-          widget_link: 'https://t.me/TarotUniverse_Bot'
+          widget_link: { url: 'https://t.me/TarotUniverse_Bot', name: 'Тайны Вселенной' }
         });
+      } else {
+        // Fallback: Telegram не поддерживает shareToStory (старый клиент / десктоп)
+        window.Telegram?.WebApp?.showAlert('Поделиться в сторис доступно только в мобильном Telegram.');
       }
       storiesBtn.textContent = '📖 Поделиться в Stories';
     } catch (e) {
