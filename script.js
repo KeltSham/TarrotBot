@@ -815,6 +815,10 @@ threePopupBuyStars.addEventListener('click', () => {
 // =============================================
 // ЛУННАЯ ФАЗА (вычисляется на клиенте)
 // =============================================
+
+// Контекст текущей лунной фазы — используется в тексте расклада
+let _moonContext = '';
+
 (function _initMoonPhase() {
   const knownNew = new Date('2000-01-06T18:14:00Z').getTime();
   const cycle    = 29.53058867 * 86400000;   // мс
@@ -831,15 +835,16 @@ threePopupBuyStars.addEventListener('click', () => {
   else if (frac < 0.75 + T)                 idx = 6; // последняя четверть
   else                                       idx = 7; // тёмная луна
   const phases = [
-    ["🌑", "Новолуние — время задавать намерения"],
-    ["🌒", "Растущий серп — энергия набирает силу"],
-    ["🌓", "Первая четверть — действуй решительно"],
-    ["🌔", "Прибывающая луна — желания усиливаются"],
-    ["🌕", "Полнолуние — пик энергии, эмоции обострены"],
-    ["🌖", "Убывающая луна — время завершать дела"],
-    ["🌗", "Последняя четверть — подводи итоги"],
-    ["🌘", "Тёмная луна — береги силы, время тишины"],
+    ["🌑", "Новолуние — время задавать намерения",      "Сейчас новолуние — лучшее время задавать намерения."],
+    ["🌒", "Растущий серп — энергия набирает силу",     "Луна растёт — энергия набирает силу, начатое будет крепнуть."],
+    ["🌓", "Первая четверть — действуй решительно",     "Первая четверть: самое время для решительных шагов."],
+    ["🌔", "Прибывающая луна — желания усиливаются",    "Прибывающая луна усиливает желания — не упусти момент."],
+    ["🌕", "Полнолуние — пик энергии, эмоции обострены","Полнолуние: энергия на пике, доверяй интуиции."],
+    ["🌖", "Убывающая луна — время завершать дела",     "Убывающая луна — самое время завершать начатое и отпускать лишнее."],
+    ["🌗", "Последняя четверть — подводи итоги",        "Последняя четверть: подводи итоги и готовься к новому циклу."],
+    ["🌘", "Тёмная луна — береги силы, время тишины",   "Тёмная луна призывает к тишине — береги силы и прислушайся к себе."],
   ];
+  _moonContext = phases[idx][2];
   const el = document.getElementById('moon-phase-bar');
   if (el) el.innerHTML = `<span class="moon-emoji">${phases[idx][0]}</span> ${phases[idx][1]}`;
 })();
@@ -1281,6 +1286,7 @@ async function performReading(mode = 'question') {
   tarotCardContainer.style.display = 'block';
   setTimeout(() => tarotCardContainer.classList.add('visible'), 10);
   tarotCard.classList.remove('flipped');
+  resultSection.style.display = '';         // сбрасываем inline display:none, выставленный resetBtn
   resultSection.classList.remove('visible');
 
   // Генерируем карту заранее
@@ -1329,9 +1335,16 @@ async function performReading(mode = 'question') {
       } else {
         cardMeaning.textContent = meaningText;
       }
-      
+
+      // Совет карты + лунный контекст
+      const tipEl = document.getElementById('card-tip');
+      if (tipEl) {
+        const moonSuffix = _moonContext ? ` ${_moonContext}` : '';
+        tipEl.textContent = (randomCard.tip || '') + moonSuffix;
+      }
+
       resultSection.classList.add('visible');
-      
+
       // Сохраняем текущую карту для работы Stories
       lastDrawnCard = randomCard;
       lastDrawnMeaning = cardMeaning.textContent;

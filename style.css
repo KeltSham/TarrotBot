@@ -373,6 +373,20 @@ h1 {
   animation: fadeInText 0.8s ease-out 0.4s both;
 }
 
+.result-section.visible #card-tip {
+  animation: fadeInText 0.8s ease-out 0.7s both;
+}
+
+.card-tip {
+  font-style: italic;
+  font-size: 1rem;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.6);
+  margin-top: 1.1rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(212, 175, 55, 0.2);
+}
+
 .result-section {
   width: 100%;
   max-width: 650px;
@@ -1003,6 +1017,12 @@ footer {
 }
 [data-theme="light"] .oleg-btn:hover {
   box-shadow: 0 0 16px rgba(184,134,11,0.38);
+}
+
+/* Совет карты — более тёмный текст на светлом фоне */
+[data-theme="light"] .card-tip {
+  color: rgba(44, 26, 5, 0.6);
+  border-top-color: rgba(184, 134, 11, 0.25);
 }
 
 /* Попап upsell: слегка темнее оверлей для контраста на светлом фоне */
