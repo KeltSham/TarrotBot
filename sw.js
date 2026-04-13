@@ -8,7 +8,7 @@
 //   • Telegram SDK             → network-only (всегда свежий)
 // =============================================
 
-const CACHE_VER    = 'v6';
+const CACHE_VER    = 'v7';
 const STATIC_CACHE = `tarot-static-${CACHE_VER}`;
 const IMAGE_CACHE  = `tarot-images-${CACHE_VER}`;
 const FONT_CACHE   = `tarot-fonts-v1`;   // версия шрифтов меняется редко

@@ -1098,8 +1098,15 @@ async function initApp() {
     } catch(e) { /* fallback на localStorage */ }
   }
   // Показываем кнопку «История» только Premium пользователям
-  if (isPremium && apiUrl) {
+  if ((isPremium || _serverStatus.is_paid) && apiUrl) {
     modeHistoryBtn.classList.remove('hidden');
+  }
+
+  // Обновляем текст лимит-сообщения под реальный лимит пользователя
+  const _limitTextEl = document.getElementById('limit-message-text');
+  if (_limitTextEl) {
+    const _realLimit = _serverStatus.limit || (isPremium ? PREMIUM_LIMIT : FREE_LIMIT);
+    _limitTextEl.textContent = `Вы использовали ${_realLimit} из ${_realLimit} раскладов на сегодня. Приходите завтра или напишите тарологу Олегу для личного и более глубокого погружения!`;
   }
   if (!checkLimit()) {
     modeSelection.classList.add('hidden');
@@ -1250,7 +1257,7 @@ function _showResultFooter(card, mode) {
   };
 
   // Кнопка Stories — только для «Карты дня» и только если API доступен
-  if (mode === 'daily' && window.Telegram?.WebApp?.shareToStory) {
+  if (mode === 'daily' && window.Telegram?.WebApp?.shareToStories) {
     storiesBtn.classList.remove('hidden');
     // Мы не назначаем здесь onclick, так как в конце файла есть глобальный 
     // listener, который генерирует красивую картинку через Canvas
