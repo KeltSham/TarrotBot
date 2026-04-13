@@ -1,10 +1,28 @@
 :root {
-  --primary-color: #3b0959; /* Deep Purple */
-  --secondary-color: #210433; /* Darker Purple for contrast */
-  --gold: #d4af37; /* Metallic Gold */
-  --light-gold: #f3e5ab; /* Soft Gold for text */
+  /* DARK THEME (Default) */
+  --bg-color: #0b0213;
+  --primary-color: #3b0959;
+  --secondary-color: #210433;
+  --gold: #d4af37;
+  --light-gold: #f3e5ab;
   --text-bright: #ffffff;
-  --bg-gradient: radial-gradient(circle at center, var(--primary-color), var(--secondary-color));
+  --card-bg: #1a0433;
+  --input-bg: rgba(33, 4, 51, 0.7);
+  --btn-text: #1a0224;
+  --bg-overlay-opacity: 0.25;
+}
+
+[data-theme="light"] {
+  --bg-color: #f7f3e9; /* Parchment/Paper */
+  --primary-color: #d9c8a9; /* Soft sand */
+  --secondary-color: #e8e2d0;
+  --gold: #b8860b; /* Darker gold for contrast */
+  --light-gold: #5e461a; /* Dark brown-gold for text */
+  --text-bright: #2c1a05;
+  --card-bg: #ffffff;
+  --input-bg: rgba(255, 255, 255, 0.8);
+  --btn-text: #ffffff;
+  --bg-overlay-opacity: 0.1;
 }
 
 * {
@@ -15,14 +33,42 @@
 
 body {
   font-family: 'Cormorant Garamond', serif;
-  background-color: #0b0213;
+  background-color: var(--bg-color);
   color: var(--light-gold);
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  transition: background-color 0.5s ease, color 0.5s ease;
   align-items: center;
   overflow-x: hidden;
   position: relative;
+}
+
+.theme-toggle {
+  position: fixed;
+  top: 15px;
+  right: 15px;
+  width: 44px;
+  height: 44px;
+  background: rgba(212, 175, 55, 0.15);
+  border: 1px solid var(--gold);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 1001;
+  transition: all 0.3s ease;
+  box-shadow: 0 0 10px rgba(0,0,0,0.2);
+}
+
+.theme-toggle:hover {
+  background: rgba(212, 175, 55, 0.3);
+  transform: scale(1.1);
+}
+
+.theme-icon {
+  font-size: 1.4rem;
 }
 
 .background-overlay {
@@ -31,7 +77,7 @@ body {
   background-image: url('images/bg_mystic_1774882343565.png');
   background-size: cover;
   background-position: center;
-  opacity: 0.25;
+  opacity: var(--bg-overlay-opacity);
   z-index: -1;
   pointer-events: none;
 }
@@ -116,7 +162,7 @@ h1 {
   padding: 1rem 1.5rem;
   font-size: 1.2rem;
   font-family: 'Cormorant Garamond', serif;
-  background: rgba(33, 4, 51, 0.7);
+  background: var(--input-bg);
   border: 1px solid var(--gold);
   border-radius: 30px;
   color: var(--text-bright);
@@ -142,7 +188,7 @@ h1 {
   font-family: 'Playfair Display', serif;
   text-transform: uppercase;
   background: linear-gradient(135deg, var(--gold), #b8860b);
-  color: #1a0224;
+  color: var(--btn-text);
   border: none;
   border-radius: 30px;
   cursor: pointer;
@@ -187,6 +233,7 @@ h1 {
   position: relative;
   transition: transform 1.2s cubic-bezier(0.8, -0.4, 0.2, 1.4);
   transform-style: preserve-3d;
+  will-change: transform;  /* GPU-слой: перекладываем анимацию на видеокарту */
   cursor: pointer;
   box-shadow: 0 20px 40px rgba(0,0,0,0.8), 0 5px 15px rgba(0,0,0,0.6), 0 0 25px rgba(212, 175, 55, 0.2);
   border-radius: 12px;
@@ -204,6 +251,7 @@ h1 {
   background-position: center;
   border: 2px solid var(--gold);
   box-shadow: inset 0 0 20px rgba(0,0,0,0.9), inset 0 0 0 2px rgba(212, 175, 55, 0.3);
+  will-change: transform;  /* GPU-слой для backface flip */
 }
 
 /* Эффект стеклянного глянцевого отблеска на картах (мистика/дороговизна) */
@@ -217,14 +265,14 @@ h1 {
 }
 
 .card-back {
-  background-image: url('images/tarot_back_1774882589907.png');
+  background-image: url('images/tarot_back_1774882589907.webp');
 }
 
 .card-front {
   transform: rotateY(180deg);
   position: relative;
   overflow: hidden;
-  background: #0b0213; /* фон на случай ошибки загрузки изображения */
+  background: var(--card-bg); /* фон на случай ошибки загрузки изображения */
   padding: 0;
 }
 
@@ -796,4 +844,174 @@ footer {
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* Spinner for loading state */
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(212, 175, 55, 0.1);
+  border-top-color: var(--gold);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ============================================================
+   СВЕТЛАЯ ТЕМА — полный набор оверрайдов
+   Проблема была в том, что множество элементов использовали
+   захардкоженные тёмные значения вместо CSS-переменных.
+   Этот блок перекрывает все такие места.
+   CSS-переменные (--bg-color, --gold и т.д.) → в :root выше.
+============================================================ */
+
+/* Заголовок: убираем тяжёлую чёрную тень */
+[data-theme="light"] h1 {
+  text-shadow: 1px 1px 3px rgba(0,0,0,0.12), 0 0 12px rgba(184,134,11,0.28);
+}
+
+/* Лунная фаза — читаемый тёмно-янтарный */
+[data-theme="light"] .moon-phase-bar {
+  color: rgba(94, 70, 26, 0.85);
+}
+
+/* Мистические символы: тень под золото */
+[data-theme="light"] .esoteric-symbols {
+  text-shadow: 0 0 10px rgba(184,134,11,0.4);
+}
+
+/* Поле ввода: светлая обводка, читаемый placeholder */
+[data-theme="light"] #question-input {
+  box-shadow: inset 0 1px 4px rgba(0,0,0,0.07), 0 0 10px rgba(184,134,11,0.1);
+}
+[data-theme="light"] #question-input:focus {
+  border-color: var(--gold);
+  box-shadow: inset 0 1px 4px rgba(0,0,0,0.05), 0 0 18px rgba(184,134,11,0.26);
+}
+[data-theme="light"] #question-input::placeholder {
+  color: rgba(94, 70, 26, 0.38);
+}
+
+/* Блок результата: тёплое стекло вместо тёмно-фиолетового rgba(33,4,51) */
+[data-theme="light"] .result-section {
+  background: rgba(255, 251, 240, 0.93);
+  border-color: rgba(184, 134, 11, 0.28);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.09), 0 2px 8px rgba(0,0,0,0.05);
+}
+
+/* Блок исчерпанного лимита: уходим от тёмно-пурпурного */
+[data-theme="light"] #limit-message {
+  background: rgba(255, 243, 243, 0.96);
+  border-color: #c0392b;
+  color: #5a1010;
+}
+[data-theme="light"] #limit-message h3 {
+  color: #c0392b;
+}
+
+/* Таймер обратного отсчёта: белый текст → тёмный */
+[data-theme="light"] .countdown-label {
+  color: rgba(44, 26, 5, 0.6);
+}
+
+/* Кнопка-контур при ховере: не белый #fff, а тёмно-коричневый */
+[data-theme="light"] .outline-btn:hover {
+  color: var(--text-bright);
+  background: rgba(184,134,11,0.1);
+}
+
+/* Основные кнопки: более мягкие тени */
+[data-theme="light"] .mystic-btn {
+  box-shadow: 0 3px 10px rgba(0,0,0,0.15), 0 0 14px rgba(184,134,11,0.25);
+}
+[data-theme="light"] .mystic-btn:hover {
+  box-shadow: 0 5px 16px rgba(0,0,0,0.2), 0 0 22px rgba(184,134,11,0.4);
+}
+
+/* Карточки: убираем тяжёлые чёрные тени */
+[data-theme="light"] .tarot-card {
+  box-shadow: 0 8px 22px rgba(0,0,0,0.14), 0 2px 8px rgba(0,0,0,0.08),
+              0 0 16px rgba(184,134,11,0.14);
+}
+[data-theme="light"] .tarot-card.mini {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.11), 0 0 10px rgba(184,134,11,0.1);
+}
+[data-theme="light"] .tarot-card.mini:hover {
+  box-shadow: 0 8px 20px rgba(0,0,0,0.16), 0 0 18px rgba(184,134,11,0.24);
+}
+
+/* card-face: убираем непрозрачный чёрный inner shadow */
+[data-theme="light"] .card-face {
+  box-shadow: inset 0 0 8px rgba(0,0,0,0.06),
+              inset 0 0 0 2px rgba(184,134,11,0.18);
+}
+
+/* Надпись внизу карты: тёплый кремовый фон вместо rgba(0,0,0,0.5) */
+[data-theme="light"] .card-name-bottom {
+  background: rgba(247, 243, 233, 0.85);
+}
+
+/* Анимация парения карты: светлые тени */
+[data-theme="light"] .tarot-card-container.visible {
+  animation: floatCardLight 4s ease-in-out infinite;
+}
+@keyframes floatCardLight {
+  0%   { transform: translateY(0px)   scale(1);    box-shadow: 0 8px 22px rgba(0,0,0,0.14), 0 0 16px rgba(184,134,11,0.14); }
+  50%  { transform: translateY(-14px) scale(1.02); box-shadow: 0 20px 36px rgba(0,0,0,0.2),  0 0 30px rgba(184,134,11,0.28); }
+  100% { transform: translateY(0px)   scale(1);    box-shadow: 0 8px 22px rgba(0,0,0,0.14), 0 0 16px rgba(184,134,11,0.14); }
+}
+
+/* Анимация переворота карты: золотое свечение вместо фиолетово-белого */
+[data-theme="light"] .tarot-card.flipped {
+  animation: cardRevealLight 1.8s ease-out forwards;
+}
+@keyframes cardRevealLight {
+  0%   { box-shadow: 0 0 0 rgba(184,134,11,0); }
+  20%  { box-shadow: 0 0 22px rgba(212,175,55,0.7), 0 0 44px rgba(212,175,55,0.35); }
+  50%  { box-shadow: 0 0 44px rgba(212,175,55,0.9), 0 0 88px rgba(212,175,55,0.45); }
+  80%  { box-shadow: 0 0 28px rgba(212,175,55,0.6), 0 0 55px rgba(212,175,55,0.22); }
+  100% { box-shadow: 0 8px 22px rgba(0,0,0,0.14), 0 0 18px rgba(184,134,11,0.14); }
+}
+
+/* Пульсация после переворота: мягкое золотое дыхание */
+[data-theme="light"] .tarot-card.flipped .card-front {
+  animation: cardFrontGlowLight 3s ease-in-out 1.5s infinite;
+}
+@keyframes cardFrontGlowLight {
+  0%, 100% { box-shadow: 0 0 0 rgba(212,175,55,0),    0 0 10px rgba(184,134,11,0.1); }
+  50%       { box-shadow: 0 0 14px rgba(212,175,55,0.25), 0 0 30px rgba(184,134,11,0.3); }
+}
+
+/* История раскладов: тёплые карточки вместо тёмно-фиолетовых */
+[data-theme="light"] .history-item {
+  background: rgba(255, 251, 240, 0.88);
+  border-color: rgba(184,134,11,0.2);
+}
+[data-theme="light"] .history-item:hover {
+  border-color: rgba(184,134,11,0.48);
+}
+
+/* Кнопка «Написать Олегу»: фиолетовый → янтарный */
+[data-theme="light"] .oleg-btn {
+  background: linear-gradient(135deg, rgba(184,134,11,0.1), rgba(212,175,55,0.07));
+  border-color: var(--gold);
+  color: var(--gold) !important;
+  box-shadow: 0 0 8px rgba(184,134,11,0.18);
+}
+[data-theme="light"] .oleg-btn:hover {
+  box-shadow: 0 0 16px rgba(184,134,11,0.38);
+}
+
+/* Попап upsell: слегка темнее оверлей для контраста на светлом фоне */
+[data-theme="light"] .upsell-popup {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+/* Спиннер загрузки карты */
+[data-theme="light"] .spinner {
+  border-color: rgba(184,134,11,0.12);
+  border-top-color: var(--gold);
 }

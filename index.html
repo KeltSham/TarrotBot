@@ -10,16 +10,36 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Magic Tarot">
-  <link rel="apple-touch-icon" href="images/tarot_back_1774882589907.png">
+  <link rel="apple-touch-icon" href="images/tarot_back_1774882589907.webp">
 
   <!-- Telegram Mini App Script -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
   <link rel="stylesheet" href="style.css">
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+  <!--
+    Анти-флэш: читаем сохранённую тему из localStorage ДО первой отрисовки страницы.
+    Это предотвращает «вспышку» тёмного фона при выбранной светлой теме.
+    Скрипт намеренно минимален и синхронен — никаких зависимостей.
+  -->
+  <script>
+    (function() {
+      try {
+        var t = localStorage.getItem('tarot-theme');
+        if (t === 'light' || t === 'dark') {
+          document.documentElement.setAttribute('data-theme', t);
+        }
+      } catch(e) {}
+    })();
+  </script>
 </head>
-<body style="background-color: #0b0213;">
+<body>
   <div class="background-overlay"></div>
+  
+  <div class="theme-toggle" id="theme-toggle" title="Переключить тему">
+    <span class="theme-icon">🌙</span>
+  </div>
+
   <div class="container">
     <header class="header">
       <p id="moon-phase-bar" class="moon-phase-bar"></p>
@@ -154,6 +174,21 @@
       <div class="esoteric-symbols-bottom">⟡ ⟡ ⟡</div>
     </footer>
   </div>
-  <script src="script.js?v=6"></script>
+  <script src="script.js?v=7"></script>
+
+  <!-- Service Worker: offline-кэш изображений, CSS, шрифтов -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('./sw.js')
+          .then(function(reg) {
+            console.log('[SW] Registered, scope:', reg.scope);
+          })
+          .catch(function(err) {
+            console.warn('[SW] Registration failed:', err);
+          });
+      });
+    }
+  </script>
 </body>
 </html>

@@ -12,6 +12,52 @@ if (window.Telegram && window.Telegram.WebApp) {
 // Классическая колода Rider-Waite-Smith, общественное достояние
 // =============================================
 const IMG = 'images/';
+let lastDrawnCard = null;
+let lastDrawnMeaning = '';
+
+// --- УМНАЯ ПРЕДЗАГРУЗКА ИЗОБРАЖЕНИЙ ---
+const preloadedImages = {};
+let _isPreloadingActive = false;
+
+function preloadEssentialAssets() {
+  // Грузим только то, что нужно для первого экрана
+  const back = new Image();
+  back.src = 'images/tarot_back_1774882589907.webp';
+  
+  const bg = new Image();
+  bg.src = 'images/bg_mystic_1774882343565.png';
+}
+
+function preloadRemainingInBatches() {
+  if (_isPreloadingActive) return;
+  _isPreloadingActive = true;
+  
+  const cards = [...tarotDeck];
+  const batchSize = 4;
+  
+  function loadNextBatch() {
+    if (cards.length === 0) return;
+    const batch = cards.splice(0, batchSize);
+    
+    Promise.all(batch.map(card => {
+      return new Promise(res => {
+        const img = new Image();
+        img.onload = res;
+        img.onerror = res;
+        img.src = card.image;
+        preloadedImages[card.name] = img;
+      });
+    })).then(() => {
+      // Даем браузеру «подышать» между пачками
+      if (window.requestIdleCallback) {
+        requestIdleCallback(loadNextBatch, { timeout: 2000 });
+      } else {
+        setTimeout(loadNextBatch, 1000);
+      }
+    });
+  }
+  loadNextBatch();
+}
 
 const tarotDeck = [
 
@@ -595,20 +641,102 @@ function analyzeContext(question) {
 }
 
 // =============================================
+// ЗАГРУЗКА ИЗОБРАЖЕНИЙ С ПОВТОРНЫМИ ПОПЫТКАМИ (для VPN / слабых устройств)
+// =============================================
+const _IMG_RETRIES = 4;          // попыток загрузить одно изображение
+const _IMG_RETRY_BASE_MS = 1500; // базовая задержка между попытками
+
+/**
+ * Загружает img.src с экспоненциальным backoff при ошибке.
+ * loader — DOM-элемент спиннера/заглушки.
+ * cardName — текст для fallback если все попытки провалились.
+ */
+function _loadImageWithRetry(img, src, loader, cardName, attempt) {
+  attempt = attempt || 0;
+
+  // Снимаем старые обработчики ДО изменения src — предотвращает двойной вызов
+  // при повторных попытках и утечки памяти на слабых устройствах
+  img.onload  = null;
+  img.onerror = null;
+
+  img.src = '';           // сбрасываем, чтобы браузер снова запросил
+  img.src = src;
+
+  img.onload = () => {
+    img.onload  = null;   // сразу освобождаем, больше не нужен
+    img.onerror = null;
+    img.style.display = 'block';
+    if (loader) loader.style.display = 'none';
+  };
+
+  img.onerror = () => {
+    img.onload  = null;   // чистим до запуска таймера
+    img.onerror = null;
+    if (attempt < _IMG_RETRIES) {
+      // Обновляем текст лоадера, показывая прогресс ожидания
+      if (loader) {
+        const dotsEl = loader.querySelector('.retry-dots');
+        if (dotsEl) dotsEl.textContent = ' ·'.repeat(attempt + 1);
+      }
+      const delay = _IMG_RETRY_BASE_MS * Math.pow(1.6, attempt);
+      setTimeout(() => _loadImageWithRetry(img, src, loader, cardName, attempt + 1), delay);
+    } else {
+      // Все попытки провалились — показываем название карты как fallback
+      if (loader) loader.innerHTML =
+        `<div style="padding:1rem;text-align:center;font-size:0.85rem;line-height:1.4;color:var(--gold);">
+           🃏<br>${cardName}
+         </div>`;
+    }
+  };
+}
+
+// =============================================
 // ОТРИСОВКА ЛИЦЕВОЙ СТОРОНЫ КАРТЫ (изображение Уэйта)
 // =============================================
 function buildCardFace(card, containerEl) {
   const front = containerEl.querySelector('.card-front');
   if (!front) return;
+
   front.style.padding = '0';
-  front.style.background = 'none';
-  // Используем <img> для поддержки fallback при ошибке загрузки
-  front.innerHTML = `<img
-    src="${card.image}"
-    alt="${card.name}"
-    style="width:100%;height:100%;object-fit:cover;border-radius:10px;display:block;"
-    onerror="this.style.display='none'; this.parentNode.style.background='linear-gradient(160deg,#1a0433,#0b0213)'; this.parentNode.innerHTML='<div style=\\'display:flex;align-items:center;justify-content:center;height:100%;color:var(--gold);font-size:1rem;padding:1rem;text-align:center;\\'>' + '${card.name.replace(/'/g,"\\'")}' + '</div>';"
-  >`;
+  // Убираем захардкоженный тёмный цвет — берём из CSS-переменной,
+  // чтобы светлая тема работала корректно (было #0b0213 — всегда тёмный)
+  front.style.background = 'var(--card-bg)';
+
+  // Если картинка уже была предзагружена — используем её (быстрый путь)
+  const cached = preloadedImages[card.name];
+  if (cached && cached.complete && cached.naturalWidth > 0) {
+    front.innerHTML = '';
+    const imgEl = document.createElement('img');
+    imgEl.src       = card.image;
+    imgEl.alt       = card.name;
+    imgEl.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:10px;';
+    front.appendChild(imgEl);
+    return;
+  }
+
+  // Медленный путь: пока настоящее изображение грузится — показываем рубашку карты
+  // как плейсхолдер. Убирает «белый/пустой прямоугольник» на медленных соединениях.
+  // Когда img загрузится (display:block, z-index:2), он перекрывает фоновый плейсхолдер.
+  front.style.backgroundImage    = "url('images/tarot_back_1774882589907.webp')";
+  front.style.backgroundSize     = 'cover';
+  front.style.backgroundPosition = 'center';
+
+  const loaderHtml = `
+    <div class="card-loader" style="position:absolute;inset:0;display:flex;flex-direction:column;
+         align-items:center;justify-content:center;color:var(--gold);z-index:1;gap:6px;
+         background:rgba(0,0,0,0.42);">
+      <div class="spinner"></div>
+      <span class="retry-dots" style="font-size:0.7rem;letter-spacing:2px;min-height:1em;"></span>
+    </div>`;
+  front.innerHTML = loaderHtml;
+
+  const loader = front.querySelector('.card-loader');
+  const img    = document.createElement('img');
+  img.alt      = card.name;
+  img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:10px;display:none;position:relative;z-index:2;';
+  front.appendChild(img);
+
+  _loadImageWithRetry(img, card.image, loader, card.name, 0);
 }
 
 // =============================================
@@ -644,6 +772,16 @@ const limitMessage       = document.getElementById('limit-message');
 const upsellPopup        = document.getElementById('upsell-popup');
 const closePopupBtn      = document.getElementById('close-popup');
 const shareBtn           = document.getElementById('share-btn');
+const storiesBtn         = document.getElementById('stories-btn');
+const themeToggle        = document.getElementById('theme-toggle');
+const themeIcon          = themeToggle ? themeToggle.querySelector('.theme-icon') : null;
+
+// На случай если кнопки Stories нет в HTML, но мы её используем
+if (storiesBtn) {
+  if (window.Telegram?.WebApp?.shareToStories) {
+    storiesBtn.classList.remove('hidden');
+  }
+}
 
 // =============================================
 // PREMIUM CHECK
@@ -796,6 +934,10 @@ function _todayLocal() {
 }
 
 async function _loadUsage() {
+  // Запускаем предзагрузку при старте: сначала критичные ассеты, потом остальные карты — фоново
+  preloadEssentialAssets();
+  setTimeout(preloadRemainingInBatches, 3000);
+
   const today = _todayLocal();
   try {
     const raw   = await _csGet('tarotUsage3');
@@ -846,6 +988,30 @@ async function useCardApi(serviceType) {
     console.warn('Tarot API error:', e);
     return null;
   }
+}
+
+/**
+ * Локальная история раскладов — fallback-хранилище (CloudStorage / localStorage).
+ * Работает всегда, независимо от подключения к API.
+ * Хранит до 20 последних раскладов.
+ */
+function _saveHistoryLocal(card, mode) {
+  try {
+    const entry = {
+      card:    card.name,
+      meaning: (cardMeaning.textContent || '').slice(0, 500),
+      mode:    mode,
+      date:    _todayLocal()
+    };
+    _csGet('tarotLocalHistory').then(raw => {
+      try {
+        const arr = raw ? JSON.parse(raw) : [];
+        arr.unshift(entry);
+        if (arr.length > 20) arr.splice(20);
+        _csSet('tarotLocalHistory', JSON.stringify(arr));
+      } catch(e) { /* silent */ }
+    }).catch(() => {});
+  } catch(e) { /* silent */ }
 }
 
 /**
@@ -1081,15 +1247,8 @@ function _showResultFooter(card, mode) {
   // Кнопка Stories — только для «Карты дня» и только если API доступен
   if (mode === 'daily' && window.Telegram?.WebApp?.shareToStory) {
     storiesBtn.classList.remove('hidden');
-    storiesBtn.onclick = () => {
-      window.Telegram.WebApp.shareToStory(card.image, {
-        text: `🔮 Моя карта дня: ${card.name}`,
-        widget_link: {
-          url:  `https://t.me/${window.Telegram.WebApp.initDataUnsafe?.bot?.username || ''}`,
-          name: 'Открыть расклад'
-        }
-      });
-    };
+    // Мы не назначаем здесь onclick, так как в конце файла есть глобальный 
+    // listener, который генерирует красивую картинку через Canvas
   } else {
     storiesBtn.classList.add('hidden');
   }
@@ -1098,12 +1257,6 @@ function _showResultFooter(card, mode) {
 }
 
 async function performReading(mode = 'question') {
-  // Локальная проверка без API
-  if (!apiUrl && !checkLimit()) {
-    alert("Энергия на сегодня иссякла 🌙 Приходите завтра!");
-    return;
-  }
-
   let userQuestion = "";
   let context      = "general";
 
@@ -1118,102 +1271,76 @@ async function performReading(mode = 'question') {
     context = analyzeContext(userQuestion);
   }
 
-  // Единая серверная проверка + инкремент (или fallback на CloudStorage)
+  // --- МГНОВЕННЫЙ ОТКЛИК ---
+  if (mode === 'question') {
+    inputSection.classList.add('hidden');
+  } else if (mode === 'daily') {
+    dailyCardsSection.classList.add('hidden');
+  }
+  
+  tarotCardContainer.style.display = 'block';
+  setTimeout(() => tarotCardContainer.classList.add('visible'), 10);
+  tarotCard.classList.remove('flipped');
+  resultSection.classList.remove('visible');
+
+  // Генерируем карту заранее
+  const randomCard = tarotDeck[Math.floor(Math.random() * tarotDeck.length)];
+  buildCardFace(randomCard, tarotCard);
+
+  // --- ПАРАЛЛЕЛЬНАЯ ПРОВЕРКА ЛИМИТОВ ---
   const serviceType = mode === 'daily' ? 'daily' : mode === 'question' ? 'question' : 'three';
-  if (apiUrl) {
-    const result = await useCardApi(serviceType);
-    if (result !== null) {
-      if (!result.allowed) {
-        _serverStatus.limit_reached = true;
-        modeSelection.classList.add('hidden');
-        limitMessage.classList.remove('hidden');
-        _startCountdown();
-        return;
-      }
-    } else {
-      if (!checkLimit()) { alert("Энергия на сегодня иссякла 🌙 Приходите завтра!"); return; }
-      incrementLocalUsage();
+  const apiPromise = apiUrl ? useCardApi(serviceType) : Promise.resolve({ allowed: true });
+
+  try {
+    const result = await apiPromise;
+    if (result && result.allowed === false) {
+      tarotCardContainer.classList.remove('visible');
+      setTimeout(() => { tarotCardContainer.style.display = 'none'; }, 500);
+      modeSelection.classList.add('hidden');
+      limitMessage.classList.remove('hidden');
+      _startCountdown();
+      return;
     }
-  } else {
+  } catch (e) {
+    if (!checkLimit()) return;
     incrementLocalUsage();
   }
 
-  if (mode === 'question') {
-    inputSection.style.opacity   = '0';
-    inputSection.style.transform = 'translateY(-20px)';
-    setTimeout(() => { inputSection.classList.add('hidden'); }, 500);
-  }
-
+  // Продолжаем анимацию
   setTimeout(() => {
-    tarotCardContainer.style.display = 'block';
-    requestAnimationFrame(() => tarotCardContainer.classList.add('visible'));
-
-    const randomCard = tarotDeck[Math.floor(Math.random() * tarotDeck.length)];
-
-    let meaningText = "";
-    if (context === 'love')        meaningText = randomCard.love    || randomCard.meaning;
-    else if (context === 'career') meaningText = randomCard.car     || randomCard.meaning;
-    else                           meaningText = randomCard.meaning;
-
-    let answerHtml = "";
-    if (mode === 'question') {
-      const prefixes = {
-        love:    ["На ваш вопрос о чувствах:", "В делах любовных карты говорят:"],
-        career:  ["По поводу вашей работы:", "Ваша карьерная судьба шепчет:"],
-        general: ["Карты отвечают:", "Вселенная говорит вам:"]
-      };
-      const rs = prefixes[context][Math.floor(Math.random() * prefixes[context].length)];
-      answerHtml = `<em>Ваш вопрос: «${userQuestion}»</em><br><br><strong>✨ ${rs}</strong><br><br>${meaningText}<br><br><em>${randomCard.tip}</em>`;
-    } else {
-      answerHtml = `<strong>✨ Подсказка на день:</strong><br><br>${meaningText}<br><br><em>${randomCard.tip}</em>`;
-    }
-
+    tarotCard.classList.add('flipped');
+    
     setTimeout(() => {
-      buildCardFace(randomCard, tarotCard);
-      tarotCard.classList.add('flipped');
-      if (window.Telegram?.WebApp?.HapticFeedback) {
-        window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
+      cardTitle.textContent = randomCard.name;
+      
+      let meaningText = "";
+      if (context === 'love')        meaningText = randomCard.love    || randomCard.meaning;
+      else if (context === 'career') meaningText = randomCard.car     || randomCard.meaning;
+      else                           meaningText = randomCard.meaning;
+
+      if (mode === 'question') {
+        const prefixes = {
+          love:    ["На ваш вопрос о чувствах:", "В делах любовных карты говорят:"],
+          career:  ["По поводу вашей работы:", "Ваша карьерная судьба шепчет:"],
+          general: ["Карты отвечают:", "Вселенная говорит вам:"]
+        };
+        const choice = prefixes[context][Math.floor(Math.random() * prefixes[context].length)];
+        cardMeaning.textContent = `${choice} ${meaningText}`;
+      } else {
+        cardMeaning.textContent = meaningText;
       }
+      
+      resultSection.classList.add('visible');
+      
+      // Сохраняем текущую карту для работы Stories
+      lastDrawnCard = randomCard;
+      lastDrawnMeaning = cardMeaning.textContent;
 
-      setTimeout(() => {
-        const wordCount = answerHtml.replace(/<[^>]+>/g, '').split(/\s+/).filter(Boolean).length;
-        // Множитель 100 мс/слово — задержка до показа текста
-        const delayMs   = wordCount * 100;
-        // Плашка появляется через 5 сек (<100 слов) или 8 сек (≥100 слов) ПОСЛЕ текста
-        const footerDelayMs = wordCount < 100 ? 5000 : 8000;
-
-        cardTitle.innerText   = `Ваша карта: ${randomCard.name}`;
-        cardMeaning.innerHTML = `<strong>✨ Карты раскрыты... Считываю энергии и формирую ответ, подождите...</strong>`;
-        resultSection.style.display = 'block';
-
-        setTimeout(() => {
-          resultSection.classList.add('visible');
-          // Убрали автоскролл здесь, чтобы карта не дергалась во время переворота
-        }, 50);
-
-        setTimeout(() => {
-          cardMeaning.style.opacity = '0';
-          setTimeout(() => {
-            cardMeaning.innerHTML     = answerHtml;
-            cardMeaning.style.opacity = '1';
-            // Мягко скроллим к началу текста, а не в самый подвал
-            resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            
-            scheduleUpsell(answerHtml);
-            // Сохраняем расклад в историю (Premium — сервер сам фильтрует)
-            saveReading(randomCard.name, meaningText, mode);
-
-            // Плашка с кнопками — через 5 или 8 секунд после текста
-            setTimeout(() => {
-              _showResultFooter(randomCard, mode);
-              // Убрали автоскролл в подвал
-            }, footerDelayMs);
-          }, 500);
-        }, delayMs);
-
-      }, 1000);
-    }, 1500);
-  }, mode === 'question' ? 500 : 50);
+      _saveHistoryLocal(randomCard, mode);
+      _showResultFooter(randomCard, mode);
+      scheduleUpsell(cardMeaning.textContent);
+    }, 800);
+  }, 400);
 }
 
 resetBtn.addEventListener('click', () => {
@@ -1225,7 +1352,7 @@ resetBtn.addEventListener('click', () => {
   setTimeout(() => {
     resultSection.style.display = 'none';
     tarotCardContainer.classList.remove('visible');
-    setTimeout(() => { tarotCardContainer.style.display = 'none'; }, 500);
+    setTimeout(() => { tarotCardContainer.style.display = 'none'; }, 200);
     questionInput.value = '';
 
     if (!checkLimit()) {
@@ -1237,7 +1364,7 @@ resetBtn.addEventListener('click', () => {
       modeSelection.style.opacity = '1';
     }
     setTimeout(() => { window.scrollTo({ top: 0, behavior: 'smooth' }); }, 50);
-  }, 1000);
+  }, 300);
 });
 
 // =============================================
@@ -1323,3 +1450,180 @@ drawThreeBtn.addEventListener('click', async () => {
     }, index * 900);
   });
 });
+// =============================================
+// STORIES GENERATION (CANVAS)
+// =============================================
+async function generateStoryImage(card, meaningText) {
+  // Ждем загрузки шрифтов, чтобы Canvas не выдал дефолтный шрифт
+  if (document.fonts) await document.fonts.ready;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = 1080;
+  canvas.height = 1920;
+  const ctx = canvas.getContext('2d');
+
+  // 1. Фон - градиент
+  const grad = ctx.createRadialGradient(540, 960, 0, 540, 960, 1000);
+  grad.addColorStop(0, '#3b0959');
+  grad.addColorStop(1, '#0b0213');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 1080, 1920);
+
+  // 2. Рисуем символы сверху
+  ctx.fillStyle = '#d4af37';
+  ctx.font = '60px serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('✧ ☾ ☼ ☽ ✧', 540, 150);
+
+  // 3. Заголовок
+  ctx.font = 'bold 80px "Playfair Display", serif';
+  ctx.fillText('ТАЙНЫ ВСЕЛЕННОЙ', 540, 260);
+  
+  // 4. Отрисовка карты
+  const cardImg = new Image();
+  cardImg.crossOrigin = "anonymous";
+  cardImg.src = card.image;
+  
+  await new Promise((res) => { cardImg.onload = res; cardImg.onerror = res; });
+  
+  if (cardImg.complete && cardImg.naturalWidth > 0) {
+    // Тень для карты
+    ctx.shadowBlur = 50;
+    ctx.shadowColor = 'rgba(0,0,0,0.8)';
+    
+    const cardW = 500;
+    const cardH = 800;
+    const cardX = (1080 - cardW) / 2;
+    const cardY = 380;
+    
+    // Рамка карты (золото)
+    ctx.strokeStyle = '#d4af37';
+    ctx.lineWidth = 10;
+    ctx.strokeRect(cardX - 5, cardY - 5, cardW + 10, cardH + 10);
+    
+    ctx.drawImage(cardImg, cardX, cardY, cardW, cardH);
+    ctx.shadowBlur = 0;
+  }
+
+  // 5. Название карты
+  ctx.fillStyle = '#d4af37';
+  ctx.font = 'bold 70px "Playfair Display", serif';
+  ctx.fillText(card.name.toUpperCase(), 540, 1280);
+
+  // 6. Разделитель
+  ctx.font = '50px serif';
+  ctx.fillText('✦', 540, 1350);
+
+  // 7. Текст расшифровки (с переносом строк)
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '42px "Cormorant Garamond", serif';
+  
+  function wrapText(context, text, x, y, maxWidth, lineHeight) {
+    const words = text.split(' ');
+    let line = '';
+    let currentY = y;
+    for(let n = 0; n < words.length; n++) {
+      let testLine = line + words[n] + ' ';
+      let metrics = context.measureText(testLine);
+      if (metrics.width > maxWidth && n > 0) {
+        context.fillText(line, x, currentY);
+        line = words[n] + ' ';
+        currentY += lineHeight;
+      } else {
+        line = testLine;
+      }
+    }
+    context.fillText(line, x, currentY);
+  }
+  
+  wrapText(ctx, meaningText, 540, 1450, 850, 55);
+
+  // 8. Брендинг снизу
+  ctx.fillStyle = 'rgba(212, 175, 55, 0.5)';
+  ctx.font = '36px serif';
+  ctx.fillText('@TarotUniverse_Bot', 540, 1820);
+
+  return canvas.toDataURL('image/png');
+}
+
+// Обработчик для Stories
+if (storiesBtn) {
+  storiesBtn.addEventListener('click', async () => {
+    try {
+      if (!lastDrawnCard) return;
+
+      storiesBtn.textContent = '⏳ Генерирую...';
+      const imageData = await generateStoryImage(lastDrawnCard, lastDrawnMeaning || cardMeaning.textContent);
+      
+      if (window.Telegram?.WebApp?.shareToStories) {
+        window.Telegram.WebApp.shareToStories(imageData, {
+          text: 'Мой расклад дня в Тайны Вселенной 🔮',
+          widget_link: 'https://t.me/TarotUniverse_Bot'
+        });
+      }
+      storiesBtn.textContent = '📖 Поделиться в Stories';
+    } catch (e) {
+      console.error(e);
+      storiesBtn.textContent = '📖 Ошибка';
+    }
+  });
+}
+
+// =============================================
+// ПЕРЕКЛЮЧАТЕЛЬ ТЕМЫ (dark / light)
+// =============================================
+
+/**
+ * Устанавливает тему, сохраняет выбор и обновляет иконку.
+ * save=false используется при автосинхронизации с Telegram — не перезаписывает
+ * ручной выбор пользователя в localStorage.
+ */
+function setTheme(theme, save = true) {
+  document.documentElement.setAttribute('data-theme', theme);
+  if (save) {
+    try { localStorage.setItem('tarot-theme', theme); } catch(e) {}
+  }
+  if (themeIcon) {
+    themeIcon.textContent = theme === 'light' ? '☀️' : '🌙';
+  }
+}
+
+// Инициализация: приоритеты — ручной выбор → тема Telegram → системные предпочтения → dark
+(function _initTheme() {
+  let saved = null;
+  try { saved = localStorage.getItem('tarot-theme'); } catch(e) {}
+
+  if (saved === 'light' || saved === 'dark') {
+    // Пользователь сам выбрал — уважаем
+    setTheme(saved, false);
+  } else {
+    // Берём тему из Telegram, если открыто внутри приложения
+    const tgScheme = window.Telegram?.WebApp?.colorScheme;
+    if (tgScheme === 'light' || tgScheme === 'dark') {
+      setTheme(tgScheme, false);
+    } else if (window.matchMedia?.('(prefers-color-scheme: light)').matches) {
+      setTheme('light', false);
+    }
+    // Иначе остаётся dark — дефолт в CSS (:root без data-theme)
+  }
+})();
+
+// Если Telegram меняет тему системно — синхронизируем, но только если
+// пользователь ещё не сделал ручной выбор
+if (window.Telegram?.WebApp?.onEvent) {
+  window.Telegram.WebApp.onEvent('themeChanged', () => {
+    let saved = null;
+    try { saved = localStorage.getItem('tarot-theme'); } catch(e) {}
+    if (!saved) {
+      setTheme(window.Telegram.WebApp.colorScheme || 'dark', false);
+    }
+  });
+}
+
+// Клик по кнопке — ручное переключение, сохраняем выбор
+if (themeToggle) {
+  themeToggle.addEventListener('click', () => {
+    const current = document.documentElement.getAttribute('data-theme') || 'dark';
+    setTheme(current === 'light' ? 'dark' : 'light');
+  });
+}

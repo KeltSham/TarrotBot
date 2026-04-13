@@ -1,10 +1,15 @@
 # Database
-users.db
+data/
+*.db
 *.sqlite
 
 # Secrets and environment configurations
 .env
 
+# Logs
+bot.log
+
 # Python generated files
 __pycache__/
 *.pyc
+*.pyo

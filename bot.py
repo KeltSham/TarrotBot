@@ -19,15 +19,26 @@ load_dotenv()
 from logging.handlers import RotatingFileHandler
 
 # --- Логирование ---
+class ConflictFilter(logging.Filter):
+    """Фильтр для подавления частых ошибок 409 Conflict в логах."""
+    def filter(self, record):
+        msg = record.getMessage()
+        if "Error code: 409" in msg or "Conflict: terminated by other getUpdates request" in msg:
+            return False
+        return True
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s [%(levelname)s] %(message)s',
     handlers=[
-        RotatingFileHandler('bot.log', maxBytes=5*1024*1024, backupCount=3, encoding='utf-8'),
+        RotatingFileHandler('bot.log', maxBytes=1*1024*1024, backupCount=5, encoding='utf-8'),
         logging.StreamHandler()
     ]
 )
 logger = logging.getLogger(__name__)
+logger.addFilter(ConflictFilter())
+# Применяем фильтр и к логгеру telebot, чтобы не спамил
+telebot.logger.addFilter(ConflictFilter())
 
 # --- НАСТРОЙКИ ---
 TOKEN = os.getenv("BOT_TOKEN")
@@ -66,7 +77,14 @@ logger.info("Бот инициализирован.")
 if not os.path.exists('data'):
     os.makedirs('data')
 conn = sqlite3.connect('data/users.db', check_same_thread=False)
-conn.execute('PRAGMA journal_mode=WAL')  # Безопасная работа с несколькими потоками
+# WAL-mode: параллельные читатели не блокируют писателя (критично для бота с HTTP-сервером)
+conn.execute('PRAGMA journal_mode=WAL')
+# NORMAL: безопасно при WAL (fsync только на checkpoint), заметно быстрее FULL
+conn.execute('PRAGMA synchronous=NORMAL')
+# Ждать до 5 секунд если БД занята другим потоком (вместо немедленного SQLITE_BUSY)
+conn.execute('PRAGMA busy_timeout=5000')
+# 32 MB page-cache: уменьшает количество дисковых чтений при активной работе
+conn.execute('PRAGMA cache_size=-32000')
 with conn:
     conn.execute('''
         CREATE TABLE IF NOT EXISTS users (
@@ -119,6 +137,10 @@ with conn:
             created_at   TEXT    NOT NULL
         )
     ''')
+    # Индексы для быстрого поиска (критично при росте usage_log)
+    conn.execute('CREATE INDEX IF NOT EXISTS idx_ul_user_date ON usage_log(user_id, date)')
+    conn.execute('CREATE INDEX IF NOT EXISTS idx_ul_date      ON usage_log(date)')
+    conn.execute('CREATE INDEX IF NOT EXISTS idx_rh_user      ON readings_history(user_id)')
 
 def get_user(user_id):
     with conn:
@@ -135,7 +157,7 @@ def get_all_users():
 def get_stats():
     """Возвращает (total, paid, trial, expired, push_on)."""
     users = get_all_users()
-    now = datetime.datetime.now()
+    now = datetime.datetime.utcnow()   # сервер в Нидерландах — используем UTC
     paid = trial = push_on = 0
     for u in users:
         uid, trial_end, sub_end, push = u[0], u[1], u[2], (u[3] if len(u) > 3 else 1)
@@ -215,15 +237,53 @@ def get_user_local_date(user_id) -> str:
     JS getTimezoneOffset() возвращает: UTC+3 → -180, UTC-5 → 300.
     Формула: local_time = UTC - offset_minutes.
     """
-    cursor = conn.cursor()
-    cursor.execute('SELECT timezone_offset FROM users WHERE user_id=?', (user_id,))
-    row = cursor.fetchone()
+    with conn:
+        cursor = conn.cursor()
+        cursor.execute('SELECT timezone_offset FROM users WHERE user_id=?', (user_id,))
+        row = cursor.fetchone()
     tz_offset = row[0] if (row and row[0] is not None) else -180  # MSK по умолчанию
     user_local = datetime.datetime.utcnow() - datetime.timedelta(minutes=tz_offset)
     return user_local.strftime('%Y-%m-%d')
 
+_TZ_OFFSET_MIN = -720   # UTC+12  (самая восточная зона)
+_TZ_OFFSET_MAX =  840   # UTC-14  (острова Лайн)
+
 def update_timezone_offset(user_id, tz_offset: int):
-    """Сохраняет/обновляет timezone_offset пользователя (из JS getTimezoneOffset)."""
+    """
+    Сохраняет/обновляет timezone_offset пользователя (из JS getTimezoneOffset).
+
+    Защита от перемотки времени:
+      - Значение должно быть в допустимом диапазоне реальных часовых поясов.
+      - Если смена offset'а сдвигает «сегодня» пользователя назад или вперёд
+        И у него уже есть записи за текущую дату — обновление блокируется.
+        Это не даёт обнулять лимит, изменив «свой» часовой пояс.
+    """
+    if not isinstance(tz_offset, int) or not (_TZ_OFFSET_MIN <= tz_offset <= _TZ_OFFSET_MAX):
+        return
+
+    utc_now = datetime.datetime.utcnow()
+    new_date = (utc_now - datetime.timedelta(minutes=tz_offset)).strftime('%Y-%m-%d')
+
+    with conn:
+        cursor = conn.cursor()
+        cursor.execute('SELECT timezone_offset FROM users WHERE user_id=?', (user_id,))
+        row = cursor.fetchone()
+
+    if row and row[0] is not None:
+        old_offset  = row[0]
+        old_date    = (utc_now - datetime.timedelta(minutes=old_offset)).strftime('%Y-%m-%d')
+        # Если смена часового пояса меняет «текущую дату» — проверяем нет ли использований
+        if old_date != new_date:
+            with conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    'SELECT COUNT(*) FROM usage_log WHERE user_id=? AND date=?',
+                    (user_id, old_date)
+                )
+                used_today = cursor.fetchone()[0]
+            if used_today > 0:
+                return   # блокируем: изменение TZ обнулило бы лимит
+
     with conn:
         conn.execute('UPDATE users SET timezone_offset=? WHERE user_id=?', (tz_offset, user_id))
 
@@ -312,17 +372,28 @@ def check_and_increment_limit(user_id, service_type, tz_offset: int = None):
         )
     return True
 
+_INIT_DATA_MAX_AGE = 7 * 24 * 3600   # initData считается валидным 7 дней
+
 def validate_init_data(init_data_str):
-    """Проверяет подпись Telegram WebApp initData. Возвращает user_id или None."""
+    """
+    Проверяет подпись Telegram WebApp initData. Возвращает user_id или None.
+    Дополнительно проверяет свежесть данных (auth_date).
+    """
     if not init_data_str:
         return None
     try:
+        import time as _time
         parsed = dict(_urllib_parse.parse_qsl(init_data_str, keep_blank_values=True))
         hash_val = parsed.pop('hash', '')
         data_check = '\n'.join(f'{k}={v}' for k, v in sorted(parsed.items()))
         secret = _hmac.new(b'WebAppData', TOKEN.encode(), hashlib.sha256).digest()
         computed = _hmac.new(secret, data_check.encode(), hashlib.sha256).hexdigest()
         if not _hmac.compare_digest(computed, hash_val):
+            return None
+        # Проверяем свежесть: auth_date не должен быть старше _INIT_DATA_MAX_AGE
+        auth_date = int(parsed.get('auth_date', 0))
+        if auth_date and (_time.time() - auth_date) > _INIT_DATA_MAX_AGE:
+            logger.warning(f"validate_init_data: устаревший auth_date ({auth_date})")
             return None
         return _json.loads(parsed.get('user', '{}')).get('id')
     except Exception as e:
@@ -339,8 +410,8 @@ def _build_webapp_url(is_premium: bool) -> str:
     return url
 
 def add_user(user_id, referred_by=None):
-    now = datetime.datetime.now()
-    bonus = 3 if referred_by else 0          # реферал даёт +3 дня к стандартным 7
+    now = datetime.datetime.utcnow()           # UTC — сервер в Нидерландах
+    bonus = 3 if referred_by else 0            # реферал даёт +3 дня к стандартным 7
     trial_end = now + datetime.timedelta(days=7 + bonus)
     with conn:
         conn.execute(
@@ -354,10 +425,10 @@ def extend_trial(user_id, days):
     user = get_user(user_id)
     if not user:
         return None
-    now = datetime.datetime.now()
+    now = datetime.datetime.utcnow()
     try:
-        current_end = datetime.datetime.fromisoformat(user[0])
-    except Exception:
+        current_end = datetime.datetime.fromisoformat(user[0]) if user[0] else now
+    except (ValueError, TypeError):
         current_end = now
     new_end = max(current_end, now) + datetime.timedelta(days=days)
     with conn:
@@ -367,20 +438,20 @@ def extend_trial(user_id, days):
 
 def update_subscription(user_id, days=30):
     user = get_user(user_id)
-    now = datetime.datetime.now()
-    
+    now = datetime.datetime.utcnow()
+
     current_sub_end = None
     if user and user[1]:
         try:
             current_sub_end = datetime.datetime.fromisoformat(user[1])
-        except Exception:
+        except (ValueError, TypeError):
             pass
 
     if current_sub_end and current_sub_end > now:
         new_end = current_sub_end + datetime.timedelta(days=days)
     else:
         new_end = now + datetime.timedelta(days=days)
-        
+
     with conn:
         conn.execute('UPDATE users SET sub_end_date = ? WHERE user_id = ?', (new_end.isoformat(), user_id))
     return new_end
@@ -390,12 +461,19 @@ def has_access(user_id):
     if not user:
         return False, "Not registered", False
 
-    now = now_msk()
-    trial_end = datetime.datetime.fromisoformat(user[0])
+    now = datetime.datetime.utcnow()  # UTC: согласуется с add_user/update_subscription
+
+    try:
+        trial_end = datetime.datetime.fromisoformat(user[0]) if user[0] else datetime.datetime.min
+    except (ValueError, TypeError):
+        trial_end = datetime.datetime.min
 
     sub_end = None
     if user[1]:
-        sub_end = datetime.datetime.fromisoformat(user[1])
+        try:
+            sub_end = datetime.datetime.fromisoformat(user[1])
+        except (ValueError, TypeError):
+            pass
 
     if sub_end and sub_end > now:
         return True, f"Активная подписка (осталось {(sub_end - now).days} дней)", True
@@ -418,7 +496,7 @@ def _admin_menu_markup():
     return markup
 
 def _build_users_page(users, page):
-    now = datetime.datetime.now()
+    now = datetime.datetime.utcnow()
     total = len(users)
     total_pages = max(1, (total + USERS_PER_PAGE - 1) // USERS_PER_PAGE)
     chunk = users[page * USERS_PER_PAGE : (page + 1) * USERS_PER_PAGE]
@@ -506,7 +584,12 @@ def admin_callback(call):
                               reply_markup=markup, parse_mode="HTML")
 
     elif data == "admin_broadcast":
-        msg = bot.send_message(call.message.chat.id, "📢 <b>Режим рассылки</b>\nВведите текст, который увидят ВСЕ пользователи:", parse_mode="HTML")
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton("❌ Отмена", callback_data="admin_menu"))
+        msg = bot.send_message(call.message.chat.id, 
+            "📢 <b>Режим рассылки</b>\n\nВведите текст, который увидят ВСЕ пользователи.\n\n"
+            "⚠️ Текст не должен начинаться со знака / (команды игнорируются).", 
+            reply_markup=markup, parse_mode="HTML")
         bot.register_next_step_handler(msg, process_broadcast)
 
     elif data.startswith("admin_users_"):
@@ -537,8 +620,11 @@ def admin_callback(call):
 def process_broadcast(message):
     if message.from_user.id != ADMIN_ID: return
     text = message.text
-    if not text or text.lower() in ['отмена', 'cancel', '/start']:
+    if not text or text.lower() in ['отмена', 'cancel', '/start', '/admin']:
         bot.send_message(message.chat.id, "❌ Рассылка отменена.")
+        return
+    if text.startswith('/'):
+        bot.send_message(message.chat.id, "❌ Рассылка команд запрещена! Введите обычный текст.")
         return
     with conn:
         users = conn.execute('SELECT user_id FROM users').fetchall()
@@ -742,24 +828,31 @@ def cmd_profile(message):
     except Exception:
         ref_link = f"(ошибка получения ссылки, попробуйте позже)"
 
-    cursor = conn.cursor()
-    cursor.execute('SELECT COUNT(*) FROM users WHERE referred_by = ?', (user_id,))
-    count = cursor.fetchone()[0]
+    with conn:
+        cursor = conn.cursor()
+        cursor.execute('SELECT COUNT(*) FROM users WHERE referred_by = ?', (user_id,))
+        count = cursor.fetchone()[0]
 
     text += (
         f"\n\n🔗 <b>Ваша реферальная ссылка:</b>\n"
         f"<code>{ref_link}</code>\n\n"
-        f"Поделитесь с друзьями:\n"
-        f"• Друг получит <b>+3 дня</b> Premium-доступа\n"
-        f"• Вы получите <b>+3 дня</b> за каждого приглашённого\n\n"
-        f"👥 Приглашено друзей: <b>{count}</b>"
+        f"🎁 <b>Приглашайте друзей!</b>\n"
+        f"• Друг получит <b>+3 дня</b> Premium\n"
+        f"• Вы получите <b>+3 дня</b> за каждого\n\n"
+        f"👥 Приглашено: <b>{count}</b>"
     )
     
     markup = InlineKeyboardMarkup()
+    markup.row(InlineKeyboardButton("📜 История раскладов", callback_data="history_simple"))
     if not is_paid:
-        markup.add(InlineKeyboardButton("🌟 Купить Premium", callback_data="buy_sub"))
+        markup.row(InlineKeyboardButton("🌟 Купить Premium", callback_data="buy_sub"))
         
     bot.send_message(message.chat.id, text, parse_mode="HTML", reply_markup=markup)
+
+@bot.callback_query_handler(func=lambda call: call.data == "history_simple")
+def history_simple_callback(call):
+    bot.answer_callback_query(call.id)
+    cmd_history(call.message)
 
 
 @bot.message_handler(commands=['start'])
@@ -868,56 +961,121 @@ def toggle_set(call):
         reply_markup=markup
     )
 
-_push_sent_dates: set = set()  # Защита от двойной рассылки при перезапуске в 10:00
+_push_sent_dates: set = set()  # Защита от двойной рассылки при перезапуске
+
+# ── Тексты утренних пушей — будни (10:00 по местному) ──
+_PUSH_WEEKDAY = None   # заполняется в push_scheduler, чтобы иметь доступ к moon_phase
+
+# ── Тексты утренних пушей — выходные (12:00 по местному) ──
+# Отдельный пул: расслабленный, без «утро задаёт тон всему дню» :)
+_PUSH_WEEKEND_EXTRA = [
+    "Ленивое утро — лучшее время для карт. {me} {mc_cap}.\n\nНе вставая с постели, заберите послание Вселенной на сегодня 🃏",
+    "Выходной — это не просто отдых, это возможность услышать себя.\n\n{me} {mc_cap}.\n\nПусть карта дня откроет вам что-то важное.",
+    "Сегодня можно никуда не спешить.\n\n{me} Сейчас {mc}.\n\nКарты уже готовы — откройте своё послание, когда будете готовы.",
+    "Неспешное утро — идеальное время, чтобы задать Вселенной вопрос.\n\n{me} {mc_cap}.\n\nЧто ждёт вас сегодня?",
+    "Выходной день полон неожиданных подарков.\n\n{me} <b>{mn}</b> настраивает всё на лучший лад.\n\nУзнайте, что приготовили карты!",
+    "{me} <b>{mn}</b> — особое время для тех, кто слышит тишину.\n\nСегодняшний выходной хранит послание лично для вас.",
+    "Пока весь мир ещё спит — карты уже знают, что принесёт этот день.\n\n{me} {mc_cap}.\n\nЗаберите свой расклад!",
+    "Хороший выходной начинается с хорошего вопроса.\n\n{me} {mc_cap}.\n\nЧто вы хотите узнать у Вселенной сегодня?",
+]
 
 def push_scheduler():
-    """Фоновая задача: пуши в 10:00 (по местному), 12:00 (истечение) и 19:00 (стрик)."""
+    """
+    Фоновая задача: утренние пуши по МЕСТНОМУ времени пользователя.
+      • Будни    → 10:00 местного
+      • Выходные → 12:00 местного  (люди спят дольше)
+    Плюс: стрик-пуш 19:00 МСК и пуш об истечении подписки 12:00 МСК.
+    """
     while True:
         try:
-            now_utc = datetime.datetime.utcnow()
+            now_utc    = datetime.datetime.utcnow()
             now_msk_dt = now_msk()
-            today_str = now_utc.strftime('%Y-%m-%d')
-            today_msk = now_msk_dt.strftime('%Y-%m-%d')
+            today_str  = now_utc.strftime('%Y-%m-%d')
+            today_msk  = now_msk_dt.strftime('%Y-%m-%d')
 
-            # --- 1. Утренние пуши (по МЕСТНОМУ времени 10:00) ---
+            # --- 1. Утренние пуши (по МЕСТНОМУ времени, час зависит от дня недели) ---
             with conn:
                 cursor = conn.cursor()
                 cursor.execute('''
-                    SELECT user_id, timezone_offset 
-                    FROM users 
-                    WHERE push_enabled = 1 AND (last_push_date IS NULL OR last_push_date != ?)
+                    SELECT user_id, timezone_offset
+                    FROM users
+                    WHERE push_enabled = 1 AND COALESCE(last_push_date, '') != ?
                 ''', (today_str,))
                 users_morning = cursor.fetchall()
 
             if users_morning:
                 moon_emoji, moon_name, moon_ctx = get_moon_phase()
-                push_variants = [
-                    f"✨ <b>Доброе утро!</b>\n\n{moon_emoji} Сейчас {moon_ctx}.\n\nКарты готовы открыть послание Вселенной специально для вас — заберите Карту Дня!",
-                    f"🔮 Новый день — новое послание.\n\n{moon_emoji} <b>{moon_name}</b> усиливает энергию расклада.\n\nУзнайте, что карты говорят о сегодняшнем дне!",
-                    f"🌅 <b>Утренний расклад ждёт вас!</b>\n\n{moon_emoji} {moon_ctx.capitalize()}.\n\nОдин взгляд на карту — и день пройдёт осознаннее. Заглядывайте! 🃏",
-                    f"🌙 <b>Вселенная шепчет что-то важное...</b>\n\n{moon_emoji} {moon_ctx.capitalize()}.\n\nОткройте Карту Дня — карты уже выбрали послание именно для вас.",
+                me  = moon_emoji
+                mn  = moon_name
+                mc  = moon_ctx
+                mc_cap = moon_ctx.capitalize()
+
+                # Пул текстов для будней
+                weekday_variants = [
+                    f"✨ <b>Доброе утро!</b>\n\n{me} Сейчас {mc}.\n\nКарты готовы открыть послание Вселенной специально для вас — заберите Карту Дня!",
+                    f"🔮 Новый день — новое послание.\n\n{me} <b>{mn}</b> усиливает энергию расклада.\n\nУзнайте, что карты говорят о сегодняшнем дне!",
+                    f"🌅 <b>Утренний расклад ждёт вас!</b>\n\n{me} {mc_cap}.\n\nОдин взгляд на карту — и день пройдёт осознаннее. Заглядывайте! 🃏",
+                    f"🌙 <b>Вселенная шепчет что-то важное...</b>\n\n{me} {mc_cap}.\n\nОткройте Карту Дня — карты уже выбрали послание именно для вас.",
                     f"🃏 <b>Ваша карта дня несёт предупреждение.</b>\n\nУзнайте, в чём оно заключается — прежде чем день войдёт в полную силу.",
-                    f"🌌 <b>Сегодня энергия особенная.</b>\n\n{moon_emoji} {moon_ctx.capitalize()}.\n\nКарты ждут, чтобы рассказать вам то, о чём вы ещё не догадываетесь.",
+                    f"🌌 <b>Сегодня энергия особенная.</b>\n\n{me} {mc_cap}.\n\nКарты ждут, чтобы рассказать вам то, о чём вы ещё не догадываетесь.",
                     f"🔮 <b>Один вопрос к Вселенной — один ответ.</b>\n\nЧто беспокоит вас прямо сейчас? Карты уже знают.",
-                    f"⚡️ <b>Утро задаёт тон всему дню.</b>\n\nВытяните карту прямо сейчас — и вы будете готовы к тому, что ждёт впереди."
+                    f"⚡️ <b>Утро задаёт тон всему дню.</b>\n\nВытяните карту прямо сейчас — и вы будете готовы к тому, что ждёт впереди.",
+                    f"🌿 <b>Каждое утро — чистая страница.</b>\n\n{me} {mc_cap}.\n\nНапишите на ней что-то важное — начните с расклада.",
+                    f"☀️ <b>Новый день принёс новые возможности.</b>\n\n{me} <b>{mn}</b> благоволит тем, кто действует осознанно.\n\nЗаберите свою карту!",
                 ]
+
+                # Пул текстов для выходных (более расслабленный тон)
+                weekend_variants = [
+                    f"🌿 <b>Ленивое утро — лучшее время для карт.</b>\n\n{me} {mc_cap}.\n\nНе вставая с постели, заберите послание Вселенной на сегодня 🃏",
+                    f"✨ <b>Выходной — это не просто отдых, это возможность услышать себя.</b>\n\n{me} {mc_cap}.\n\nПусть карта дня откроет вам что-то важное.",
+                    f"🛌 Сегодня можно никуда не спешить.\n\n{me} Сейчас {mc}.\n\nКарты уже готовы — откройте своё послание, когда будете готовы.",
+                    f"🌅 <b>Неспешное утро — идеальное время задать Вселенной вопрос.</b>\n\n{me} {mc_cap}.\n\nЧто ждёт вас сегодня?",
+                    f"🌙 <b>Выходной день полон неожиданных подарков.</b>\n\n{me} <b>{mn}</b> настраивает всё на лучший лад.\n\nУзнайте, что приготовили карты!",
+                    f"🔮 {me} <b>{mn}</b> — особое время для тех, кто слышит тишину.\n\nСегодняшний выходной хранит послание лично для вас.",
+                    f"🃏 <b>Пока весь мир ещё досыпает — карты уже знают, что принесёт этот день.</b>\n\n{me} {mc_cap}.\n\nЗаберите свой расклад!",
+                    f"☕ <b>Хороший выходной начинается с хорошего вопроса.</b>\n\n{me} {mc_cap}.\n\nЧто вы хотите узнать у Вселенной сегодня?",
+                    f"🌸 <b>Суббота или воскресенье — неважно.</b>\n\nВселенная говорит с вами каждый день.\n\n{me} {mc_cap}. Откройте карту!",
+                    f"🌟 Выходные созданы для перезагрузки.\n\n{me} <b>{mn}</b> поддерживает вас в этом.\n\nВытяните карту и узнайте, чем порадует сегодняшний день.",
+                ]
+
+                # Markup создаём один раз — одинаков для всех (DRY + экономия памяти)
+                def _make_push_markup(is_paid):
+                    m = InlineKeyboardMarkup()
+                    m.add(InlineKeyboardButton("🔮 Открыть Карту Дня",
+                                               web_app=WebAppInfo(url=_build_webapp_url(is_paid))))
+                    return m
+
                 for uid, tz_offset in users_morning:
-                    offset = tz_offset if tz_offset is not None else -180
+                    offset     = tz_offset if tz_offset is not None else -180
                     user_local = now_utc - datetime.timedelta(minutes=offset)
-                    if user_local.hour == 10:
-                        acc, _, is_p = has_access(uid)
-                        if acc:
-                            markup = InlineKeyboardMarkup()
-                            markup.add(InlineKeyboardButton("🔮 Открыть Карту Дня", web_app=WebAppInfo(url=_build_webapp_url(is_p))))
-                            try:
-                                bot.send_message(uid, _random.choice(push_variants), reply_markup=markup, parse_mode="HTML")
-                                with conn:
-                                    conn.execute('UPDATE users SET last_push_date = ? WHERE user_id = ?', (today_str, uid))
-                            except telebot.apihelper.ApiTelegramException as e:
-                                if 'bot was blocked' in str(e):
-                                    with conn: conn.execute('UPDATE users SET push_enabled=0 WHERE user_id=?', (uid,))
-                            except Exception: pass
-                            time.sleep(0.05)
+                    is_weekend = user_local.weekday() >= 5   # 5=Сб, 6=Вс
+                    push_hour  = 12 if is_weekend else 10
+
+                    if user_local.hour != push_hour:
+                        continue
+
+                    acc, _, is_p = has_access(uid)
+                    if not acc:
+                        continue
+
+                    text = _random.choice(weekend_variants if is_weekend else weekday_variants)
+                    try:
+                        bot.send_message(uid, text, reply_markup=_make_push_markup(is_p),
+                                         parse_mode="HTML")
+                        with conn:
+                            conn.execute(
+                                'UPDATE users SET last_push_date = ? WHERE user_id = ?',
+                                (today_str, uid)
+                            )
+                    except telebot.apihelper.ApiTelegramException as e:
+                        if 'bot was blocked' in str(e):
+                            with conn:
+                                conn.execute(
+                                    'UPDATE users SET push_enabled=0 WHERE user_id=?', (uid,)
+                                )
+                    except Exception:
+                        pass
+                    time.sleep(0.05)
 
             # --- 2. Стрик-пуш (19:00 по МСК) ---
             streak_key = today_msk + '_streak'
@@ -982,6 +1140,23 @@ class _MiniAppHandler(_BaseHTTPHandler):
 
     def do_GET(self):
         parsed_path = _urllib_parse.urlparse(self.path).path
+
+        # GET /api/health — проверка живости для UptimeRobot
+        if parsed_path == '/api/health':
+            try:
+                with conn:
+                    conn.execute('SELECT 1').fetchone()
+                bot.get_me()
+                res = _json.dumps({'status': 'ok', 'db': 'connected', 'telegram': 'connected'}).encode()
+                self.send_response(200)
+            except Exception as e:
+                res = _json.dumps({'status': 'error', 'detail': str(e)}).encode()
+                self.send_response(500)
+            self.send_header('Content-Type', 'application/json')
+            self._cors()
+            self.end_headers()
+            self.wfile.write(res)
+            return
 
         # GET /api/status?initData=...&tz_offset=...
         # → { is_paid, count, limit, limit_reached }
@@ -1050,11 +1225,35 @@ class _MiniAppHandler(_BaseHTTPHandler):
 
     def do_POST(self):
         parsed_path = _urllib_parse.urlparse(self.path).path
+
+        # Защита от DoS: ограничение размера тела запроса (64 KB)
+        _MAX_BODY = 65_536
         length = int(self.headers.get('Content-Length', 0))
+        if length > _MAX_BODY:
+            self.send_response(413)
+            self.send_header('Content-Type', 'application/json')
+            self._cors()
+            self.end_headers()
+            self.wfile.write(_json.dumps({'error': 'request too large'}).encode())
+            return
+
         try:
-            data = _json.loads(self.rfile.read(length).decode())
-        except Exception:
-            data = {}
+            raw_body = self.rfile.read(length)
+            data = _json.loads(raw_body.decode())
+        except Exception as _json_err:
+            # Логируем сырое тело — помогает диагностировать баги фронтенда
+            _preview = raw_body[:200] if 'raw_body' in dir() else b'<unread>'
+            logger.error("[do_POST] Invalid JSON from %s: %r | body preview: %r",
+                         self.client_address, _json_err, _preview)
+            self.send_response(400)
+            self.send_header('Content-Type', 'application/json')
+            self._cors()
+            self.end_headers()
+            self.wfile.write(_json.dumps({'error': 'invalid_json'}).encode())
+            return
+
+        # Белый список допустимых типов расклада
+        _VALID_SERVICE_TYPES = frozenset({'question', 'daily', 'three'})
 
         # POST /api/use  body: { initData, serviceType, tz_offset }
         # → { allowed, count, limit }
@@ -1064,7 +1263,9 @@ class _MiniAppHandler(_BaseHTTPHandler):
                 body = _json.dumps({'allowed': False, 'error': 'invalid_init_data'}).encode()
                 self.send_response(403)
             else:
-                svc       = data.get('serviceType', 'question')
+                svc = data.get('serviceType', 'question')
+                if svc not in _VALID_SERVICE_TYPES:
+                    svc = 'question'   # неизвестный тип → fallback, не пишем мусор в БД
                 tz_offset = data.get('tz_offset')
                 try:
                     tz_offset = int(tz_offset) if tz_offset is not None else None
@@ -1130,4 +1331,8 @@ if __name__ == '__main__':
         telebot.types.BotCommand("/buy", "💎 Premium Доступ"),
         telebot.types.BotCommand("/settings", "⚙️ Настройки Уведомлений")
     ])
-    bot.infinity_polling()
+    try:
+        bot.infinity_polling(timeout=10, long_polling_timeout=5)
+    except Exception as e:
+        logger.error(f"Main polling loop error: {e}")
+        time.sleep(5)
