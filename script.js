@@ -1555,7 +1555,7 @@ async function generateStoryImage(card, meaningText) {
   // 8. Брендинг снизу
   ctx.fillStyle = 'rgba(212, 175, 55, 0.5)';
   ctx.font = '36px serif';
-  ctx.fillText('@TarotUniverse_Bot', 540, 1820);
+  ctx.fillText('@KeltTarotBot', 540, 1820);
 
   return canvas.toDataURL('image/png');
 }
@@ -1569,12 +1569,12 @@ if (storiesBtn) {
       storiesBtn.textContent = '⏳ Открываю...';
       const cardImageUrl = new URL(lastDrawnCard.image.replace('images/', 'images/story_').replace('.jpg', '.webp'), window.location.href).href;
       const meaning = (lastDrawnMeaning || cardMeaning.textContent).slice(0, 150);
-      const storyText = `🔮 Карта дня: ${lastDrawnCard.name}\n\n${meaning}\n\n🌙 Тайны Вселенной | @TarotUniverse_Bot`;
+      const storyText = `🔮 Карта дня: ${lastDrawnCard.name}\n\n${meaning}\n\n🌙 Тайны Вселенной | @KeltTarotBot`;
 
       if (window.Telegram?.WebApp?.shareToStory) {
         window.Telegram.WebApp.shareToStory(cardImageUrl, {
           text: storyText,
-          widget_link: { url: 'https://t.me/TarotUniverse_Bot', name: 'Тайны Вселенной' }
+          widget_link: { url: 'https://t.me/KeltTarotBot', name: 'Тайны Вселенной' }
         });
       } else {
         // Fallback: Telegram не поддерживает shareToStory (старый клиент / десктоп)
