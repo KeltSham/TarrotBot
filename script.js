@@ -1568,7 +1568,8 @@ if (storiesBtn) {
 
       storiesBtn.textContent = '⏳ Открываю...';
       const cardImageUrl = new URL(lastDrawnCard.image, window.location.href).href;
-      const storyText = `🔮 Карта дня: ${lastDrawnCard.name}\n\n${(lastDrawnMeaning || cardMeaning.textContent).slice(0, 200)}`;
+      const meaning = (lastDrawnMeaning || cardMeaning.textContent).slice(0, 150);
+      const storyText = `🔮 Карта дня: ${lastDrawnCard.name}\n\n${meaning}\n\n🌙 Тайны Вселенной | @TarotUniverse_Bot`;
 
       if (window.Telegram?.WebApp?.shareToStory) {
         window.Telegram.WebApp.shareToStory(cardImageUrl, {
