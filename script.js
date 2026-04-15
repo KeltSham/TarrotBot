@@ -1567,7 +1567,7 @@ if (storiesBtn) {
       if (!lastDrawnCard) return;
 
       storiesBtn.textContent = '⏳ Открываю...';
-      const cardImageUrl = new URL(lastDrawnCard.image, window.location.href).href;
+      const cardImageUrl = new URL(lastDrawnCard.image.replace('images/', 'images/story_').replace('.jpg', '.webp'), window.location.href).href;
       const meaning = (lastDrawnMeaning || cardMeaning.textContent).slice(0, 150);
       const storyText = `🔮 Карта дня: ${lastDrawnCard.name}\n\n${meaning}\n\n🌙 Тайны Вселенной | @TarotUniverse_Bot`;
 
