@@ -1566,12 +1566,13 @@ if (storiesBtn) {
     try {
       if (!lastDrawnCard) return;
 
-      storiesBtn.textContent = '⏳ Генерирую...';
-      const imageData = await generateStoryImage(lastDrawnCard, lastDrawnMeaning || cardMeaning.textContent);
-      
+      storiesBtn.textContent = '⏳ Открываю...';
+      const cardImageUrl = new URL(lastDrawnCard.image, window.location.href).href;
+      const storyText = `🔮 Карта дня: ${lastDrawnCard.name}\n\n${(lastDrawnMeaning || cardMeaning.textContent).slice(0, 200)}`;
+
       if (window.Telegram?.WebApp?.shareToStory) {
-        window.Telegram.WebApp.shareToStory(imageData, {
-          text: 'Мой расклад дня в Тайны Вселенной 🔮',
+        window.Telegram.WebApp.shareToStory(cardImageUrl, {
+          text: storyText,
           widget_link: { url: 'https://t.me/TarotUniverse_Bot', name: 'Тайны Вселенной' }
         });
       } else {
